@@ -1,0 +1,204 @@
+/* public/style.css - Versão Final com Centralização do Spinner Corrigida */
+
+/* Estilos gerais */
+body {
+    font-family: Arial, sans-serif;
+    background-color: #E3F2FD;
+    color: #0D47A1;
+    margin: 0;
+    padding: 20px;
+    text-align: center;
+}
+
+/* Logo */
+header .logo {
+    width: 100%;
+    max-height: 150px;
+    object-fit: contain;
+    margin-bottom: 20px;
+}
+
+/* Título principal */
+h1 {
+    color: #0D47A1;
+    font-size: 2.5em;
+    margin-bottom: 30px;
+}
+
+/* Container principal (usado em login.html e app.html) */
+#form-container, #options-container, #login-container, .container {
+    background-color: #FFFFFF;
+    padding: 30px;
+    border-radius: 15px;
+    box-shadow: 0 4px 10px rgba(0, 0, 0, 0.1);
+    max-width: 700px;
+    margin: 0 auto;
+}
+
+/* Rótulo do campo de tema */
+.input-label, #question {
+    font-size: 1.5em;
+    font-weight: bold;
+    margin-bottom: 10px;
+    display: block;
+    color: #0D47A1;
+}
+
+/* Campo de entrada de texto (tema do sermão) */
+.input-field, #user-input {
+    width: calc(100% - 24px);
+    padding: 15px;
+    margin-bottom: 20px;
+    border: 2px solid #0D47A1;
+    border-radius: 8px;
+    font-size: 1.2em;
+    color: #0D47A1;
+    box-sizing: border-box;
+}
+
+/* Botões gerais (Opções e Próximo Passo) */
+button, .option-button {
+    background-color: #1565C0;
+    color: #fff;
+    padding: 15px;
+    font-size: 1.4em;
+    border: none;
+    border-radius: 8px;
+    cursor: pointer;
+    width: 100%;
+    margin: 10px 0;
+    display: block;
+}
+
+button:hover, .option-button:hover {
+    background-color: #1E88E5;
+}
+
+/* CORREÇÃO DEFINITIVA: Tela de carregamento agora ocupa a tela inteira E centraliza o conteúdo */
+#loading {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%; /* Garante que o overlay ocupe toda a largura */
+    height: 100%; /* Garante que o overlay ocupe toda a altura */
+    background-color: rgba(227, 242, 253, 0.8);
+    z-index: 9999;
+    
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center; /* Centraliza verticalmente e horizontalmente */
+    
+    font-size: 1.6em;
+    color: #1565C0;
+}
+
+/* Spinner circular */
+.loader, .spinner {
+    border: 8px solid #E3F2FD;
+    border-top: 8px solid #1565C0;
+    border-radius: 50%;
+    width: 60px;
+    height: 60px;
+    animation: spin 1s linear infinite;
+    margin-bottom: 20px;
+}
+
+@keyframes spin {
+    0% { transform: rotate(0deg); }
+    100% { transform: rotate(360deg); }
+}
+
+/* Conteúdo do sermão gerado */
+#sermon-result {
+    text-align: left;
+    white-space: normal;
+    line-height: 1.8;
+    font-size: 1.5em;
+    color: #0D47A1;
+    background-color: #FFFFFF;
+    padding: 20px;
+    border-radius: 15px;
+    box-shadow: 0 4px 10px rgba(0, 0, 0, 0.1);
+    margin: 20px auto;
+    max-width: 800px;
+}
+
+/* Botão de Instalação */
+#install-button, .install-button {
+    padding: 8px 12px;
+    font-size: 0.9em;
+    background-color: #4CAF50;
+    color: white;
+    border: none;
+    border-radius: 5px;
+    cursor: pointer;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.2);
+    width: auto;
+    margin-left: 10px;
+}
+
+/* Botão/Link de Sair */
+.logout-link {
+    font-size: 0.9em;
+    color: white;
+    background-color: rgba(13, 71, 161, 0.7);
+    padding: 8px 12px;
+    border-radius: 5px;
+    text-decoration: none;
+    margin-left: 10px;
+}
+
+.logout-link:hover {
+    background-color: rgba(211, 47, 47, 0.9);
+}
+
+/* Container da tela de boas-vindas */
+.welcome-container {
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    align-items: center;
+    height: 80vh;
+    text-align: center;
+}
+.welcome-container h1 { font-size: 2.5em; margin-bottom: 20px; }
+.welcome-container p { font-size: 1.2em; max-width: 500px; margin-bottom: 40px; }
+.welcome-container .start-button { font-size: 1.8em; padding: 20px 40px; font-weight: bold; width: auto; }
+
+/* Header do app.html */
+.app-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    border-bottom: 1px solid #ddd;
+    padding-bottom: 15px;
+    margin-bottom: 25px;
+}
+.app-header h1 { margin: 0; font-size: 1.8em; }
+.header-actions { display: flex; align-items: center; }
+
+/* Ações do sermão (Salvar, Novo) */
+.sermon-actions {
+    text-align: center;
+    margin-top: 20px;
+}
+
+.sermon-actions button {
+    width: auto;
+    font-size: 1em;
+    padding: 12px 25px;
+    margin: 0 10px;
+    display: inline-block;
+}
+
+/* Container de Erro */
+#error-container {
+    padding: 30px;
+    background-color: #fff3f3;
+    border: 1px solid #d32f2f;
+    border-radius: 8px;
+}
+#error-container h2 {
+    color: #d32f2f;
+}

@@ -1,0 +1,60 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Montador de Sermões 3.2</title>
+    
+    <meta name="theme-color" content="#2196F3">
+    <link rel="manifest" href="manifest.json">
+    <link rel="apple-touch-icon" href="images/icons/icon-192x192.png">
+
+    <script src="pwa-installer.js" defer></script>
+    
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+    <div class="container">
+        <header class="app-header">
+            <h1>Montador de Sermões 3.2</h1>
+            <div class="header-actions">
+                <!-- O botão de instalação agora está presente no HTML, como esperado pelo script -->
+                <button id="install-button" class="install-button" style="display: none;">Instalar App</button>
+                <a href="/logout" class="logout-link">Sair</a>
+            </div>
+        </header>
+
+        <main>
+            <div id="step-container" style="display: none;">
+                <h2 id="question">Qual será o tema do seu sermão?</h2>
+                <div id="input-area">
+                    <input type="text" id="user-input" placeholder="Ex: A Parábola do Filho Pródigo">
+                    <button onclick="nextStep()">Próximo Passo</button>
+                </div>
+                <div id="options" style="display: none;"></div>
+            </div>
+
+            <div id="loading" style="display: none;">
+                <div class="loader"></div>
+                <p id="loading-text">Gerando seu sermão, por favor aguarde...</p>
+            </div>
+
+            <div id="sermon-result" style="display: none;">
+                <!-- O conteúdo do sermão será injetado aqui pelo script.js -->
+            </div>
+            
+            <div id="error-container" style="display: none;">
+                <!-- Mensagens de erro serão injetadas aqui pelo script.js -->
+            </div>
+
+        </main>
+    </div>
+
+    <!-- Biblioteca para gerar PDF no navegador -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+    
+    <!-- Script principal da aplicação -->
+    <script src="script.js"></script>
+</body>
+</html>
