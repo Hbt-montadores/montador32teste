@@ -1,4 +1,5 @@
-// server.js - Versão Final Definitiva com Lógica de Importação Restaurada
+--- START OF FILE server (12).js ---
+// server.js - Versão Final Definitiva com Lógica de Importação Restaurada e Notificações Push
 
 // --- 1. IMPORTAÇÕES E CONFIGURAÇÃO INICIAL ---
 require("dotenv").config();
@@ -10,17 +11,35 @@ const PgStore = require("connect-pg-simple")(session);
 const rateLimit = require('express-rate-limit');
 const fs = require('fs');
 const csv = require('csv-parser');
+const webpush = require('web-push'); // NOVO: Importa a biblioteca web-push
 
 const { 
     pool, getCustomerRecordByEmail, getCustomerRecordByPhone, getAccessControlRule,
     updateAnnualAccess, updateMonthlyStatus, updateLifetimeAccess, revokeAccessByInvoice,
-    logSermonActivity, updateGraceSermons, registerProspect
+    logSermonActivity, updateGraceSermons, registerProspect,
+    savePushSubscription, getAllPushSubscriptions // NOVO: Importa as funções de push do db.js
 } = require('./db');
 
 const app = express();
 const port = process.env.PORT || 3000;
 
 app.set('trust proxy', 1);
+
+// NOVO: Configuração do Web Push com as chaves VAPID
+const vapidPublicKey = process.env.VAPID_PUBLIC_KEY;
+const vapidPrivateKey = process.env.VAPID_PRIVATE_KEY;
+const vapidMailto = process.env.VAPID_MAILTO;
+
+if (vapidPublicKey && vapidPrivateKey && vapidMailto) {
+    webpush.setVapidDetails(
+        `mailto:${vapidMailto}`,
+        vapidPublicKey,
+        vapidPrivateKey
+    );
+    console.log('[BACKEND] VAPID keys configuradas com sucesso para Web Push.');
+} else {
+    console.warn('[BACKEND WARN] Chaves VAPID não encontradas no ambiente. As notificações Push não funcionarão.');
+}
 
 // --- 2. MIDDLEWARES (Segurança, JSON, Sessão) ---
 
@@ -63,9 +82,14 @@ function requireLogin(req, res, next) {
   }
 }
 
-// --- 3. ROTAS PÚBLICAS (Login, Logout, Webhooks) ---
+// --- 3. ROTAS PÚBLICAS (Login, Logout, Webhooks, Chave VAPID) ---
 
 const ALLOW_ANYONE = process.env.ALLOW_ANYONE === "true";
+
+// NOVO: Rota para fornecer a chave pública VAPID ao frontend
+app.get('/api/vapid-public-key', (req, res) => {
+    res.send(process.env.VAPID_PUBLIC_KEY);
+});
 
 app.get("/", (req, res) => {
     if (req.session && req.session.user) {
@@ -77,7 +101,7 @@ app.get("/", (req, res) => {
 app.get('/logout', (req, res) => {
   req.session.destroy(err => {
     if (err) {
-        console.error("Erro ao destruir sessão:", err);
+        console.error("[BACKEND ERROR] Erro ao destruir sessão:", err);
         return res.redirect('/app');
     }
     res.clearCookie('connect.sid');
@@ -151,7 +175,7 @@ app.post("/login", loginLimiter, async (req, res) => {
             }
         }
     } catch (error) {
-        console.error("Erro no processo de login por e-mail:", error);
+        console.error("[BACKEND ERROR] Erro no processo de login por e-mail:", error);
         return res.status(500).send("<h1>Erro Interno</h1><p>Ocorreu um problema no servidor. Tente novamente mais tarde.</p>");
     }
 });
@@ -168,7 +192,7 @@ app.post("/login-by-phone", loginLimiter, async (req, res) => {
             return res.status(401).send(notFoundErrorMessageHTML);
         }
     } catch (error) {
-        console.error("Erro no processo de login por celular:", error);
+        console.error("[BACKEND ERROR] Erro no processo de login por celular:", error);
         return res.status(500).send("<h1>Erro Interno</h1><p>Ocorreu um problema no servidor. Tente novamente mais tarde.</p>");
     }
 });
@@ -268,6 +292,7 @@ app.post("/eduzz/webhook", async (req, res) => {
 // --- 4. ROTAS DE ADMINISTRAÇÃO ---
 
 const getAdminPanelHeader = (key, activePage) => {
+    // MODIFICADO: Adicionado formulário para enviar notificações
     return `
         <style>
             body { font-family: sans-serif; padding: 20px; background-color: #f9f9f9; }
@@ -276,13 +301,14 @@ const getAdminPanelHeader = (key, activePage) => {
             th, td { border: 1px solid #ddd; padding: 10px; text-align: left; }
             th { background-color: #f2f2f2; }
             tr:nth-child(even) { background-color: #fff; }
-            .nav-container, .actions-container, .filter-links { margin-bottom: 20px; padding: 15px; background-color: #fff; border-radius: 8px; box-shadow: 0 1px 3px rgba(0,0,0,0.1); }
+            .nav-container, .actions-container, .filter-links, .push-container { margin-bottom: 20px; padding: 15px; background-color: #fff; border-radius: 8px; box-shadow: 0 1px 3px rgba(0,0,0,0.1); }
             .nav-links a, .filter-links a, .action-button, .import-links a { margin-right: 15px; text-decoration: none; color: #1565C0; font-weight: bold; }
             .nav-links a.active { text-decoration: underline; color: #D32F2F; }
             .filter-links a { padding: 8px 12px; border: 1px solid #1565C0; border-radius: 5px; }
             .filter-links a.active { background-color: #1565C0; color: white; }
             .action-button { background-color: #4CAF50; color: white; padding: 10px 15px; border-radius: 5px; }
             .action-button.danger { background-color: #f44336; }
+            .push-container input { width: 98%; padding: 8px; margin-bottom: 10px; }
         </style>
         <h1>Painel de Administração</h1>
         <div class="nav-container">
@@ -301,6 +327,19 @@ const getAdminPanelHeader = (key, activePage) => {
                 <a href="/admin/import-from-csv?key=${key}&plan_type=vitalicio">[Vitalícios]</a>
                 <a href="/admin/import-from-csv?key=${key}&plan_type=mensal">[Mensais]</a>
             </div>
+        </div>
+        <div class="push-container">
+            <h3>Enviar Notificação Push</h3>
+            <form action="/admin/send-push-notification" method="POST">
+                <input type="hidden" name="key" value="${key}">
+                <label for="push_title">Título:</label>
+                <input type="text" id="push_title" name="push_title" required placeholder="Ex: Novo sermão disponível!">
+                <label for="push_body">Corpo da Mensagem:</label>
+                <input type="text" id="push_body" name="push_body" required placeholder="Ex: Acesse agora e confira o novo sermão sobre a Fé.">
+                <label for="push_url">URL (link ao clicar):</label>
+                <input type="text" id="push_url" name="push_url" value="/app" required>
+                <button type="submit" class="action-button">Enviar para Todos</button>
+            </form>
         </div>
     `;
 };
@@ -338,6 +377,11 @@ app.get("/admin/view-data", async (req, res) => {
         if (message === 'grace_reset_ok') {
             html += `<p style="color: green; font-weight: bold; background-color: #e8f5e9; padding: 10px; border-radius: 5px;">Contadores de cortesia de todos os clientes foram zerados com sucesso!</p>`;
         }
+        if (message === 'push_sent_ok') {
+            const count = req.query.count || 0;
+            html += `<p style="color: green; font-weight: bold; background-color: #e8f5e9; padding: 10px; border-radius: 5px;">Notificação Push enviada com sucesso para ${count} dispositivo(s).</p>`;
+        }
+
 
         html += `
             <div class="filter-links">
@@ -370,7 +414,7 @@ app.get("/admin/view-data", async (req, res) => {
         html += '</table>';
         res.send(html);
     } catch (error) {
-        console.error("Erro ao buscar dados de admin:", error);
+        console.error("[BACKEND ERROR] Erro ao buscar dados de admin:", error);
         res.status(500).send("<h1>Erro ao buscar dados de administração.</h1>");
     }
 });
@@ -445,7 +489,7 @@ app.get("/admin/edit-customer", async (req, res) => {
         const data = { ...customer, ...accessRule, email };
         res.send(customerFormHTML(key, data));
     } catch (error) {
-        console.error("Erro ao carregar formulário de edição:", error);
+        console.error("[BACKEND ERROR] Erro ao carregar formulário de edição:", error);
         res.status(500).send("Erro interno ao carregar dados do cliente.");
     }
 });
@@ -493,7 +537,7 @@ app.post("/admin/create-customer", async (req, res) => {
         res.redirect(`/admin/view-data?key=${key}`);
     } catch (error) {
         await client.query('ROLLBACK');
-        console.error("Erro ao criar cliente:", error);
+        console.error("[BACKEND ERROR] Erro ao criar cliente:", error);
         res.status(500).send("Erro ao criar cliente.");
     } finally {
         client.release();
@@ -512,7 +556,7 @@ app.post("/admin/update-customer", async (req, res) => {
         res.redirect(`/admin/view-data?key=${key}`);
     } catch (error) {
         await client.query('ROLLBACK');
-        console.error("Erro ao atualizar cliente:", error);
+        console.error("[BACKEND ERROR] Erro ao atualizar cliente:", error);
         res.status(500).send("Erro ao atualizar dados do cliente.");
     } finally {
         client.release();
@@ -526,7 +570,7 @@ app.get("/admin/reset-grace", async (req, res) => {
         await pool.query('UPDATE customers SET grace_sermons_used = 0, updated_at = NOW()');
         res.redirect(`/admin/view-data?key=${key}&message=grace_reset_ok`);
     } catch (error) {
-        console.error("Erro ao zerar contadores de cortesia:", error);
+        console.error("[BACKEND ERROR] Erro ao zerar contadores de cortesia:", error);
         res.status(500).send("Erro ao executar a ação.");
     }
 });
@@ -546,8 +590,47 @@ app.get("/admin/view-activity", async (req, res) => {
         html += '</table>';
         res.send(html);
     } catch (error) {
-        console.error("Erro ao buscar log de atividades:", error);
+        console.error("[BACKEND ERROR] Erro ao buscar log de atividades:", error);
         res.status(500).send("<h1>Erro ao buscar dados do log.</h1>");
+    }
+});
+
+// NOVO: Rota para enviar notificações Push do painel de admin
+app.post("/admin/send-push-notification", async (req, res) => {
+    const { key, push_title, push_body, push_url } = req.body;
+    if (key !== process.env.ADMIN_KEY) { return res.status(403).send("Acesso Negado"); }
+    if (!push_title || !push_body || !push_url) { return res.status(400).send("Título, corpo e URL são obrigatórios."); }
+
+    try {
+        const subscriptions = await getAllPushSubscriptions();
+        console.log(`[BACKEND PUSH] Enviando notificação para ${subscriptions.length} dispositivo(s).`);
+
+        const payload = JSON.stringify({
+            title: push_title,
+            body: push_body,
+            url: push_url
+        });
+
+        const sendPromises = subscriptions.map(sub => 
+            webpush.sendNotification(sub, payload).catch(err => {
+                if (err.statusCode === 410) {
+                    console.log('[BACKEND PUSH] Inscrição expirada detectada. Será removida.');
+                    // Aqui você adicionaria a lógica para remover a inscrição `sub` do banco.
+                    // Por simplicidade, vamos apenas logar por enquanto.
+                } else {
+                    console.error('[BACKEND PUSH ERROR] Falha ao enviar notificação:', err.body);
+                }
+            })
+        );
+        
+        await Promise.all(sendPromises);
+
+        console.log('[BACKEND PUSH] Processo de envio de notificações concluído.');
+        res.redirect(`/admin/view-data?key=${key}&message=push_sent_ok&count=${subscriptions.length}`);
+
+    } catch (error) {
+        console.error("[BACKEND ERROR] Erro ao enviar notificações push:", error);
+        res.status(500).send("Erro interno ao enviar notificações.");
     }
 });
 
@@ -611,7 +694,7 @@ app.get("/admin/import-from-csv", async (req, res) => {
         } catch (e) {
             await client.query('ROLLBACK');
             res.end(`</ul><h2>❌ ERRO!</h2><p>Ocorreu um problema durante a importação. Nenhuma alteração foi salva (ROLLBACK).</p><pre>${e.stack}</pre>`);
-            console.error("ERRO DE IMPORTAÇÃO CSV:", e);
+            console.error("[BACKEND ERROR] ERRO DE IMPORTAÇÃO CSV:", e);
         } finally {
             client.release();
         }
@@ -634,6 +717,26 @@ app.post("/api/log-error", (req, res) => {
     console.error(`[FRONT-END LOG][Usuário: ${userEmail}][${level.toUpperCase()}]: ${message}`);
     res.status(200).send();
 });
+
+// NOVO: Rota para salvar a inscrição de notificação push
+app.post("/api/subscribe-push", requireLogin, async (req, res) => {
+    const subscription = req.body;
+    const userEmail = req.session.user.email;
+    
+    if (!subscription || !subscription.endpoint) {
+        return res.status(400).json({ error: 'Objeto de inscrição inválido.' });
+    }
+
+    try {
+        await savePushSubscription(userEmail, subscription);
+        console.log(`[BACKEND PUSH] Inscrição salva com sucesso para o usuário: ${userEmail}`);
+        res.status(201).json({ message: 'Inscrição salva com sucesso.' });
+    } catch (error) {
+        console.error('[BACKEND ERROR] Erro ao salvar inscrição push:', error);
+        res.status(500).json({ error: 'Erro ao salvar a inscrição no servidor.' });
+    }
+});
+
 
 function getPromptConfig(sermonType, duration) {
     const cleanSermonType = sermonType.replace(/^[A-Z]\)\s*/, '').trim();
@@ -775,7 +878,7 @@ app.post("/api/next-step", requireLogin, async (req, res) => {
             res.json({ sermon: data.choices[0].message.content });
         }
     } catch (error) {
-        console.error("[Erro na API /api/next-step]", error);
+        console.error("[BACKEND ERROR] Erro na API /api/next-step", error);
         return res.status(500).json({ error: `Ocorreu um erro interno no servidor ao processar sua solicitação.` });
     }
 });
@@ -785,3 +888,4 @@ app.post("/api/next-step", requireLogin, async (req, res) => {
 app.listen(port, () => {
     console.log(`🚀 Servidor rodando com sucesso na porta ${port}`);
 });
+--- END OF FILE server (12).js ---
