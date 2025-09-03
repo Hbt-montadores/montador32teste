@@ -1,3 +1,4 @@
+--- START OF FILE package (3).json ---
 {
   "name": "montador-de-sermoes",
   "version": "1.0.0",
@@ -23,3 +24,4 @@
   },
   "license": "MIT"
 }
+--- END OF FILE package (3).js ---
