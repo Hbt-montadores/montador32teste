@@ -1,4 +1,3 @@
---- START OF FILE server (12).js ---
 // server.js - Versão Final Definitiva com Lógica de Importação Restaurada e Notificações Push
 
 // --- 1. IMPORTAÇÕES E CONFIGURAÇÃO INICIAL ---
@@ -11,13 +10,13 @@ const PgStore = require("connect-pg-simple")(session);
 const rateLimit = require('express-rate-limit');
 const fs = require('fs');
 const csv = require('csv-parser');
-const webpush = require('web-push'); // NOVO: Importa a biblioteca web-push
+const webpush = require('web-push');
 
 const { 
     pool, getCustomerRecordByEmail, getCustomerRecordByPhone, getAccessControlRule,
     updateAnnualAccess, updateMonthlyStatus, updateLifetimeAccess, revokeAccessByInvoice,
     logSermonActivity, updateGraceSermons, registerProspect,
-    savePushSubscription, getAllPushSubscriptions // NOVO: Importa as funções de push do db.js
+    savePushSubscription, getAllPushSubscriptions
 } = require('./db');
 
 const app = express();
@@ -25,7 +24,7 @@ const port = process.env.PORT || 3000;
 
 app.set('trust proxy', 1);
 
-// NOVO: Configuração do Web Push com as chaves VAPID
+// Configuração do Web Push com as chaves VAPID
 const vapidPublicKey = process.env.VAPID_PUBLIC_KEY;
 const vapidPrivateKey = process.env.VAPID_PRIVATE_KEY;
 const vapidMailto = process.env.VAPID_MAILTO;
@@ -86,8 +85,12 @@ function requireLogin(req, res, next) {
 
 const ALLOW_ANYONE = process.env.ALLOW_ANYONE === "true";
 
-// NOVO: Rota para fornecer a chave pública VAPID ao frontend
+// Rota para fornecer a chave pública VAPID ao frontend
 app.get('/api/vapid-public-key', (req, res) => {
+    if (!process.env.VAPID_PUBLIC_KEY) {
+        console.error("[BACKEND ERROR] VAPID_PUBLIC_KEY não está definida no ambiente.");
+        return res.status(500).send("Configuração do servidor incompleta.");
+    }
     res.send(process.env.VAPID_PUBLIC_KEY);
 });
 
@@ -292,7 +295,6 @@ app.post("/eduzz/webhook", async (req, res) => {
 // --- 4. ROTAS DE ADMINISTRAÇÃO ---
 
 const getAdminPanelHeader = (key, activePage) => {
-    // MODIFICADO: Adicionado formulário para enviar notificações
     return `
         <style>
             body { font-family: sans-serif; padding: 20px; background-color: #f9f9f9; }
@@ -595,7 +597,6 @@ app.get("/admin/view-activity", async (req, res) => {
     }
 });
 
-// NOVO: Rota para enviar notificações Push do painel de admin
 app.post("/admin/send-push-notification", async (req, res) => {
     const { key, push_title, push_body, push_url } = req.body;
     if (key !== process.env.ADMIN_KEY) { return res.status(403).send("Acesso Negado"); }
@@ -615,8 +616,7 @@ app.post("/admin/send-push-notification", async (req, res) => {
             webpush.sendNotification(sub, payload).catch(err => {
                 if (err.statusCode === 410) {
                     console.log('[BACKEND PUSH] Inscrição expirada detectada. Será removida.');
-                    // Aqui você adicionaria a lógica para remover a inscrição `sub` do banco.
-                    // Por simplicidade, vamos apenas logar por enquanto.
+                    // Lógica para remover a inscrição `sub` do banco.
                 } else {
                     console.error('[BACKEND PUSH ERROR] Falha ao enviar notificação:', err.body);
                 }
@@ -658,7 +658,6 @@ app.get("/admin/import-from-csv", async (req, res) => {
             res.write('<p>Iniciando transação com o banco de dados...</p><ul>');
             await client.query('BEGIN');
             
-            // LÓGICA DE IMPORTAÇÃO RESTAURADA
             for (const customerData of clientsToImport) {
                 const email = customerData['Cliente / E-mail'].toLowerCase();
                 const name = customerData['Cliente / Nome'] || customerData['Cliente / Razão-Social'];
@@ -687,8 +686,7 @@ app.get("/admin/import-from-csv", async (req, res) => {
                     await client.query(`INSERT INTO customers (email, name, phone, monthly_status, updated_at) VALUES ($1, $2, $3, $4, NOW()) ON CONFLICT (email) DO UPDATE SET name = COALESCE(EXCLUDED.name, customers.name), phone = COALESCE(EXCLUDED.phone, customers.phone), monthly_status = EXCLUDED.monthly_status, updated_at = NOW()`, [email, name, phone, status]);
                 }
             }
-            // FIM DA LÓGICA DE IMPORTAÇÃO
-
+            
             await client.query('COMMIT');
             res.end(`</ul><hr><h2>✅ Sucesso!</h2><p>A importação para o plano ${plan_type.toUpperCase()} foi concluída.</p>`);
         } catch (e) {
@@ -718,7 +716,6 @@ app.post("/api/log-error", (req, res) => {
     res.status(200).send();
 });
 
-// NOVO: Rota para salvar a inscrição de notificação push
 app.post("/api/subscribe-push", requireLogin, async (req, res) => {
     const subscription = req.body;
     const userEmail = req.session.user.email;
@@ -736,7 +733,6 @@ app.post("/api/subscribe-push", requireLogin, async (req, res) => {
         res.status(500).json({ error: 'Erro ao salvar a inscrição no servidor.' });
     }
 });
-
 
 function getPromptConfig(sermonType, duration) {
     const cleanSermonType = sermonType.replace(/^[A-Z]\)\s*/, '').trim();
@@ -878,7 +874,7 @@ app.post("/api/next-step", requireLogin, async (req, res) => {
             res.json({ sermon: data.choices[0].message.content });
         }
     } catch (error) {
-        console.error("[BACKEND ERROR] Erro na API /api/next-step", error);
+        console.error("[BACKEND ERROR] Erro na API /api/next-step]", error);
         return res.status(500).json({ error: `Ocorreu um erro interno no servidor ao processar sua solicitação.` });
     }
 });
@@ -888,4 +884,3 @@ app.post("/api/next-step", requireLogin, async (req, res) => {
 app.listen(port, () => {
     console.log(`🚀 Servidor rodando com sucesso na porta ${port}`);
 });
---- END OF FILE server (12).js ---
