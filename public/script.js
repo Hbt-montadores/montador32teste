@@ -1,4 +1,3 @@
---- START OF FILE public/script.js ---
 // public/script.js - Versão Final com Correção de Sintaxe no PDF e Notificações Push
 
 // ===================================================================
@@ -69,11 +68,9 @@ window.addEventListener('load', () => {
         loadingText: document.getElementById('loading-text'),
         sermonResult: document.getElementById('sermon-result'),
         errorContainer: document.getElementById('error-container'),
-        // NOVO: Adiciona o botão de notificações
         enableNotificationsButton: document.getElementById('enable-notifications-button') 
     };
     startNewSermon();
-    // NOVO: Inicializa a lógica de notificações push
     initializePushNotifications();
   }
 });
@@ -299,7 +296,6 @@ function saveAsPdf() {
 // SEÇÃO 3: LÓGICA DE NOTIFICAÇÕES PUSH (NOVO)
 // ===================================================================
 
-// Converte a chave VAPID pública do Base64 URL Safe para um Uint8Array
 function urlBase64ToUint8Array(base64String) {
   const padding = '='.repeat((4 - base64String.length % 4) % 4);
   const base64 = (base64String + padding)
@@ -336,7 +332,6 @@ async function initializePushNotifications() {
     elements.enableNotificationsButton.style.display = 'block';
     elements.enableNotificationsButton.addEventListener('click', subscribeUserToPush);
     
-    // Verifica se já está inscrito e atualiza o texto do botão
     navigator.serviceWorker.ready.then(async (registration) => {
         const subscription = await registration.pushManager.getSubscription();
         if (subscription) {
@@ -358,6 +353,10 @@ async function subscribeUserToPush() {
     }
     const VAPID_PUBLIC_KEY = await VAPID_PUBLIC_KEY_RESPONSE.text();
 
+    if (!VAPID_PUBLIC_KEY) {
+        throw new Error('Chave VAPID recebida do servidor está vazia.');
+    }
+
     const applicationServerKey = urlBase64ToUint8Array(VAPID_PUBLIC_KEY);
     
     const subscription = await registration.pushManager.subscribe({
@@ -367,12 +366,9 @@ async function subscribeUserToPush() {
 
     console.log('[FRONTEND] Inscrição Push realizada:', subscription);
 
-    // Envia a inscrição para o seu backend
     const response = await fetch('/api/subscribe-push', {
       method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
+      headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(subscription),
     });
 
@@ -392,14 +388,14 @@ async function subscribeUserToPush() {
 
   } catch (error) {
     console.error('[FRONTEND ERROR] Erro ao inscrever o usuário para Push Notificações:', error);
+    logErrorToServer('error', `[FRONTEND PUSH ERROR] ${error.message}`);
     if (Notification.permission === 'denied') {
       alert('Você negou a permissão para notificações. Para ativá-las, mude as configurações do seu navegador.');
     } else {
-      alert('Erro ao ativar notificações. Por favor, tente novamente mais tarde.');
+      alert(`Erro ao ativar notificações: ${error.message}`);
     }
     if (elements.enableNotificationsButton) {
-        elements.enableNotificationsButton.style.display = 'none'; // Esconde o botão em caso de erro grave ou negação.
+        elements.enableNotificationsButton.style.display = 'none';
     }
   }
 }
---- END OF FILE public/script.js ---
