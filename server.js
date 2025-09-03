@@ -574,6 +574,8 @@ app.get("/admin/import-from-csv", async (req, res) => {
         try {
             res.write('<p>Iniciando transação com o banco de dados...</p><ul>');
             await client.query('BEGIN');
+            
+            // LÓGICA DE IMPORTAÇÃO RESTAURADA
             for (const customerData of clientsToImport) {
                 const email = customerData['Cliente / E-mail'].toLowerCase();
                 const name = customerData['Cliente / Nome'] || customerData['Cliente / Razão-Social'];
@@ -602,6 +604,8 @@ app.get("/admin/import-from-csv", async (req, res) => {
                     await client.query(`INSERT INTO customers (email, name, phone, monthly_status, updated_at) VALUES ($1, $2, $3, $4, NOW()) ON CONFLICT (email) DO UPDATE SET name = COALESCE(EXCLUDED.name, customers.name), phone = COALESCE(EXCLUDED.phone, customers.phone), monthly_status = EXCLUDED.monthly_status, updated_at = NOW()`, [email, name, phone, status]);
                 }
             }
+            // FIM DA LÓGICA DE IMPORTAÇÃO
+
             await client.query('COMMIT');
             res.end(`</ul><hr><h2>✅ Sucesso!</h2><p>A importação para o plano ${plan_type.toUpperCase()} foi concluída.</p>`);
         } catch (e) {
