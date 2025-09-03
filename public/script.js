@@ -1,4 +1,5 @@
-// public/script.js - Versão Final com Correção de Sintaxe no PDF
+--- START OF FILE public/script.js ---
+// public/script.js - Versão Final com Correção de Sintaxe no PDF e Notificações Push
 
 // ===================================================================
 // SEÇÃO 1: LOGGING DE ERROS DO CLIENTE E SERVICE WORKER
@@ -21,7 +22,7 @@ function logErrorToServer(level, message) {
 }
 
 window.onerror = function(message, source, lineno, colno, error) {
-  const errorMessage = `Erro não capturado: ${message} em ${source}:${lineno}:${colno}. Stack: ${error ? error.stack : 'N/A'}`;
+  const errorMessage = `[FRONTEND ERROR] Erro não capturado: ${message} em ${source}:${lineno}:${colno}. Stack: ${error ? error.stack : 'N/A'}`;
   logErrorToServer('error', errorMessage);
   return false;
 };
@@ -29,8 +30,8 @@ window.onerror = function(message, source, lineno, colno, error) {
 if ('serviceWorker' in navigator) {
   window.addEventListener('load', () => {
     navigator.serviceWorker.register('/service-worker.js')
-      .then(reg => console.log('Service Worker registrado com sucesso no app.html.'))
-      .catch(err => logErrorToServer('error', `Falha ao registrar Service Worker: ${err.message}`));
+      .then(reg => console.log('[FRONTEND] Service Worker registrado com sucesso no app.html.'))
+      .catch(err => logErrorToServer('error', `[FRONTEND ERROR] Falha ao registrar Service Worker: ${err.message}`));
   });
 }
 
@@ -67,9 +68,13 @@ window.addEventListener('load', () => {
         loading: document.getElementById('loading'),
         loadingText: document.getElementById('loading-text'),
         sermonResult: document.getElementById('sermon-result'),
-        errorContainer: document.getElementById('error-container')
+        errorContainer: document.getElementById('error-container'),
+        // NOVO: Adiciona o botão de notificações
+        enableNotificationsButton: document.getElementById('enable-notifications-button') 
     };
     startNewSermon();
+    // NOVO: Inicializa a lógica de notificações push
+    initializePushNotifications();
   }
 });
 
@@ -94,7 +99,7 @@ function startNewSermon() {
 }
 
 function handleFetchError(error) {
-    const errorMessage = `Erro na comunicação com o servidor: ${JSON.stringify(error)}`;
+    const errorMessage = `[FRONTEND ERROR] Erro na comunicação com o servidor: ${JSON.stringify(error)}`;
     logErrorToServer('error', errorMessage);
 
     elements.loading.style.display = 'none';
@@ -228,7 +233,7 @@ function generateSermon(userResponse) {
 function saveAsPdf() {
   const sermonContent = document.querySelector('.sermon-content');
   if (!sermonContent) {
-    logErrorToServer('error', 'Elemento .sermon-content não encontrado para salvar PDF.');
+    logErrorToServer('error', '[FRONTEND ERROR] Elemento .sermon-content não encontrado para salvar PDF.');
     return;
   }
   
@@ -281,11 +286,120 @@ function saveAsPdf() {
     fileName = fileName.substring(0, 50);
 
     doc.save(`${fileName}.pdf`);
-    logErrorToServer('info', `Usuário salvou o sermão "${fileName}.pdf"`);
+    logErrorToServer('info', `[FRONTEND INFO] Usuário salvou o sermão "${fileName}.pdf"`);
 
   } catch (error) {
-    console.error('Erro ao gerar PDF:', error);
-    logErrorToServer('error', `Falha ao gerar PDF: ${error.message}`);
+    console.error('[FRONTEND ERROR] Erro ao gerar PDF:', error);
+    logErrorToServer('error', `[FRONTEND ERROR] Falha ao gerar PDF: ${error.message}`);
     alert('Ocorreu um erro ao gerar o PDF. A funcionalidade pode não ser compatível com seu navegador. Tente salvar o texto manualmente.');
   }
 }
+
+// ===================================================================
+// SEÇÃO 3: LÓGICA DE NOTIFICAÇÕES PUSH (NOVO)
+// ===================================================================
+
+// Converte a chave VAPID pública do Base64 URL Safe para um Uint8Array
+function urlBase64ToUint8Array(base64String) {
+  const padding = '='.repeat((4 - base64String.length % 4) % 4);
+  const base64 = (base64String + padding)
+    .replace(/-/g, '+')
+    .replace(/_/g, '/');
+
+  const rawData = window.atob(base64);
+  const outputArray = new Uint8Array(rawData.length);
+
+  for (let i = 0; i < rawData.length; ++i) {
+    outputArray[i] = rawData.charCodeAt(i);
+  }
+  return outputArray;
+}
+
+async function initializePushNotifications() {
+  if (!('serviceWorker' in navigator) || !('PushManager' in window)) {
+    console.warn('[FRONTEND] Notificações Push não suportadas neste navegador.');
+    if (elements.enableNotificationsButton) {
+      elements.enableNotificationsButton.style.display = 'none';
+    }
+    return;
+  }
+
+  if (Notification.permission === 'denied') {
+    console.warn('[FRONTEND] Permissão de notificação negada pelo usuário.');
+    if (elements.enableNotificationsButton) {
+      elements.enableNotificationsButton.style.display = 'none';
+    }
+    return;
+  }
+
+  if (elements.enableNotificationsButton) {
+    elements.enableNotificationsButton.style.display = 'block';
+    elements.enableNotificationsButton.addEventListener('click', subscribeUserToPush);
+    
+    // Verifica se já está inscrito e atualiza o texto do botão
+    navigator.serviceWorker.ready.then(async (registration) => {
+        const subscription = await registration.pushManager.getSubscription();
+        if (subscription) {
+            elements.enableNotificationsButton.innerText = 'Notificações Ativadas';
+            elements.enableNotificationsButton.disabled = true;
+            elements.enableNotificationsButton.style.backgroundColor = '#4CAF50';
+        }
+    });
+  }
+}
+
+async function subscribeUserToPush() {
+  try {
+    const registration = await navigator.serviceWorker.ready;
+    
+    const VAPID_PUBLIC_KEY_RESPONSE = await fetch('/api/vapid-public-key');
+    if (!VAPID_PUBLIC_KEY_RESPONSE.ok) {
+        throw new Error('Falha ao buscar a chave VAPID do servidor.');
+    }
+    const VAPID_PUBLIC_KEY = await VAPID_PUBLIC_KEY_RESPONSE.text();
+
+    const applicationServerKey = urlBase64ToUint8Array(VAPID_PUBLIC_KEY);
+    
+    const subscription = await registration.pushManager.subscribe({
+      userVisibleOnly: true,
+      applicationServerKey: applicationServerKey
+    });
+
+    console.log('[FRONTEND] Inscrição Push realizada:', subscription);
+
+    // Envia a inscrição para o seu backend
+    const response = await fetch('/api/subscribe-push', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify(subscription),
+    });
+
+    if (response.ok) {
+      console.log('[FRONTEND] Inscrição Push enviada com sucesso para o servidor.');
+      alert('Notificações ativadas com sucesso!');
+      if (elements.enableNotificationsButton) {
+        elements.enableNotificationsButton.innerText = 'Notificações Ativadas';
+        elements.enableNotificationsButton.disabled = true;
+        elements.enableNotificationsButton.style.backgroundColor = '#4CAF50';
+      }
+    } else {
+      const errorText = await response.text();
+      console.error('[FRONTEND ERROR] Falha ao enviar a inscrição Push para o servidor:', errorText);
+      alert('Erro ao ativar notificações. Por favor, tente novamente.');
+    }
+
+  } catch (error) {
+    console.error('[FRONTEND ERROR] Erro ao inscrever o usuário para Push Notificações:', error);
+    if (Notification.permission === 'denied') {
+      alert('Você negou a permissão para notificações. Para ativá-las, mude as configurações do seu navegador.');
+    } else {
+      alert('Erro ao ativar notificações. Por favor, tente novamente mais tarde.');
+    }
+    if (elements.enableNotificationsButton) {
+        elements.enableNotificationsButton.style.display = 'none'; // Esconde o botão em caso de erro grave ou negação.
+    }
+  }
+}
+--- END OF FILE public/script.js ---
