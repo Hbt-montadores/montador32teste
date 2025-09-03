@@ -1,4 +1,4 @@
-// db.js - Versão de Diagnóstico com Logs de Pool
+// db.js - Versão Final com Tabela de Notificações Push
 
 const { Pool } = require('pg');
 
@@ -9,16 +9,10 @@ const pool = new Pool({
   ssl: isProduction ? { rejectUnauthorized: false } : false
 });
 
-// ===================================================================
-// ADIÇÃO DE DIAGNÓSTICO:
-// Este bloco irá "ouvir" por erros que acontecem no pool de conexões
-// em segundo plano, que normalmente não são mostrados nos logs.
-// ===================================================================
 pool.on('error', (err, client) => {
   console.error('[ERRO NO POOL DE CONEXÕES PG] Erro inesperado no cliente inativo', err);
-  process.exit(-1); // Encerra o processo para que o Render o reinicie
+  process.exit(-1);
 });
-// ===================================================================
 
 /**
  * Função auto-executável para inicializar e migrar o banco de dados.
@@ -91,6 +85,20 @@ pool.on('error', (err, client) => {
       CREATE INDEX IF NOT EXISTS "IDX_session_expire" ON "user_sessions" ("expire");
     `);
     console.log('✔️ Tabela "user_sessions" pronta.');
+
+    // ===================================================================
+    // ADIÇÃO: Nova tabela para armazenar as inscrições de Notificação Push
+    // ===================================================================
+    await client.query(`
+      CREATE TABLE IF NOT EXISTS push_subscriptions (
+        id SERIAL PRIMARY KEY,
+        user_email TEXT NOT NULL,
+        subscription_object JSONB UNIQUE NOT NULL, -- Endpoint deve ser único
+        created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+      );
+    `);
+    console.log('✔️ Tabela "push_subscriptions" pronta.');
+    // ===================================================================
 
     console.log('✅ Banco de dados pronto para uso.');
 
@@ -202,6 +210,33 @@ async function logSermonActivity(details) {
     );
 }
 
+// ===================================================================
+// ADIÇÃO: Novas funções para gerenciar as inscrições de notificação
+// ===================================================================
+
+/**
+ * Salva uma nova inscrição de notificação no banco de dados.
+ * Usa ON CONFLICT para evitar duplicatas para o mesmo endpoint.
+ */
+async function savePushSubscription(user_email, subscription_object) {
+    const query = `
+        INSERT INTO push_subscriptions (user_email, subscription_object)
+        VALUES ($1, $2)
+        ON CONFLICT (subscription_object) DO NOTHING
+    `;
+    await pool.query(query, [user_email, subscription_object]);
+}
+
+/**
+ * Busca todas as inscrições de notificação ativas no banco de dados.
+ */
+async function getAllPushSubscriptions() {
+    const { rows } = await pool.query(`SELECT subscription_object FROM push_subscriptions`);
+    return rows.map(row => row.subscription_object);
+}
+// ===================================================================
+
+
 module.exports = {
   pool,
   getCustomerRecordByEmail,
@@ -213,5 +248,8 @@ module.exports = {
   revokeAccessByInvoice,
   registerProspect,
   updateGraceSermons,
-  logSermonActivity
+  logSermonActivity,
+  // Exporta as novas funções
+  savePushSubscription,
+  getAllPushSubscriptions
 };
