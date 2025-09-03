@@ -1,21 +1,13 @@
---- START OF FILE public/service-worker.js ---
 // public/service-worker.js
 
-// Listener para o evento 'install' - útil para pré-cache de assets, mas não essencial para push.
 self.addEventListener('install', event => {
   console.log('Service Worker instalado.');
-  // Opcional: pré-cache de assets da aplicação
-  // event.waitUntil(caches.open('v1').then(cache => {
-  //   return cache.addAll(['/', '/app', '/style.css', '/script.js']);
-  // }));
 });
 
-// Listener para o evento 'activate' - útil para limpar caches antigos.
 self.addEventListener('activate', event => {
   console.log('Service Worker ativado.');
 });
 
-// Listener para o evento 'push' - aqui a mágica acontece.
 self.addEventListener('push', event => {
   if (!event.data) {
     console.error('Push event, mas sem dados.');
@@ -28,37 +20,33 @@ self.addEventListener('push', event => {
   const title = data.title || 'Montador de Sermões';
   const options = {
     body: data.body || 'Você tem uma nova mensagem!',
-    icon: '/images/logo-192.png', // Ícone da notificação
-    badge: '/images/logo-192.png', // Badge para Android (barra de status)
+    icon: '/images/logo-192.png',
+    badge: '/images/logo-192.png',
     data: {
-      url: data.url || '/app' // URL para abrir ao clicar
+      url: data.url || '/app'
     }
   };
 
   event.waitUntil(self.registration.showNotification(title, options));
 });
 
-// Listener para o evento 'notificationclick' - o que fazer quando o usuário clica.
 self.addEventListener('notificationclick', event => {
   console.log('Notificação clicada:', event.notification);
-  event.notification.close(); // Fecha a notificação
+  event.notification.close();
 
-  // Tenta focar uma aba existente do app ou abre uma nova.
   event.waitUntil(
     clients.matchAll({ type: 'window', includeUncontrolled: true }).then(clientList => {
-      const urlToOpen = event.notification.data.url;
-      // Se uma janela com a URL já estiver aberta, foca nela.
+      const urlToOpen = new URL(event.notification.data.url, self.location.origin).href;
+      
       for (const client of clientList) {
         if (client.url === urlToOpen && 'focus' in client) {
           return client.focus();
         }
       }
-      // Se não, abre uma nova janela.
+      
       if (clients.openWindow) {
         return clients.openWindow(urlToOpen);
       }
     })
   );
 });
-
---- END OF FILE public/service-worker.js ---
