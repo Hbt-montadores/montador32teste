@@ -15,56 +15,133 @@
     </header>
     
     <div class="welcome-container">
-        <h1>Parabéns!</h1>
-        <p>Seja bem-vindo ao Montador de Sermões 3.2. Para a melhor experiência, recomendamos instalar o atalho do aplicativo em seu dispositivo.</p>
+        <h1 id="welcome-title">Parabéns!</h1>
+        <p id="welcome-text">Seja bem-vindo ao Montador de Sermões 3.2. Para a melhor experiência, recomendamos instalar o atalho do aplicativo em seu dispositivo.</p>
         
-        <button id="start-button" class="start-button">Começar a Usar</button>
+        <!-- Botão 1: Instalação (inicialmente visível) -->
+        <button id="install-button" class="start-button">Começar a Usar</button>
+        
+        <!-- Botão 2: Notificações (inicialmente escondido) -->
+        <button id="notifications-button" class="start-button" style="display: none;">Receber Atualizações</button>
+
     </div>
 
     <script>
-        // Lógica final e robusta para instalação e redirecionamento
+        // Lógica final e robusta para o fluxo sequencial de Instalação -> Notificações
 
-        const startButton = document.getElementById('start-button');
-        const defaultText = 'Começar a Usar';
-        const installText = 'Instalar e Começar';
+        const installButton = document.getElementById('install-button');
+        const notificationsButton = document.getElementById('notifications-button');
+        const welcomeTitle = document.getElementById('welcome-title');
+        const welcomeText = document.getElementById('welcome-text');
 
-        // Função para atualizar o botão quando o app for instalável
-        function updateButtonToInstall() {
-            console.log('[welcome.html] Atualizando botão para modo de instalação.');
-            startButton.innerText = installText;
+        let isInstallable = false;
+
+        // Função que é chamada quando o app se torna instalável
+        function onAppInstallable() {
+            console.log('[welcome] App é instalável. Atualizando botão 1.');
+            isInstallable = true;
+            installButton.innerText = 'Instalar e Continuar';
         }
         
-        // Ouve o evento customizado disparado pelo pwa-installer.js
-        // Esta é a forma robusta de saber que o app é instalável.
-        window.addEventListener('pwa-installable', updateButtonToInstall);
+        // Ouve o evento customizado do pwa-installer.js
+        window.addEventListener('pwa-installable', onAppInstallable);
 
-        startButton.addEventListener('click', async () => {
-            // Verifica a variável global no momento do clique.
-            if (window.deferredPrompt) {
-                console.log('[welcome.html] Botão de instalação clicado. Mostrando prompt...');
-                window.deferredPrompt.prompt();
-                
-                const { outcome } = await window.deferredPrompt.userChoice;
-                
-                console.log(`[welcome.html] Resultado da instalação: ${outcome}`);
-                
-                // Limpa a referência para que o evento não seja usado novamente.
-                window.deferredPrompt = null;
-                
-                // Se a instalação foi concluída com sucesso ou dispensada,
-                // esperamos um pouco antes de redirecionar para dar tempo de a UI do SO fechar.
-                if (outcome === 'accepted' || outcome === 'dismissed') {
-                    setTimeout(() => {
-                        window.location.href = '/app';
-                    }, 500); // Meio segundo de espera
-                    return; // Impede o redirecionamento imediato abaixo
-                }
-            }
+        // Função para mostrar a etapa de notificações
+        function showNotificationsStep() {
+            console.log('[welcome] Mostrando etapa de notificações.');
+            installButton.style.display = 'none'; // Esconde o botão de instalar
             
-            // Se não houver prompt para mostrar, redireciona imediatamente.
-            console.log('[welcome.html] Nenhum prompt de instalação disponível. Redirecionando para /app.');
+            // Só mostra o botão de notificações se elas forem suportadas e a permissão não for negada
+            if (('serviceWorker' in navigator) && ('PushManager' in window) && (Notification.permission !== 'denied')) {
+                notificationsButton.style.display = 'block';
+                welcomeTitle.innerText = 'Último Passo!';
+                welcomeText.innerText = 'Clique abaixo para receber atualizações importantes e novidades do Montador de Sermões.';
+            } else {
+                // Se notificações não são possíveis, redireciona direto
+                redirectToApp();
+            }
+        }
+
+        function redirectToApp() {
+            console.log('[welcome] Redirecionando para /app.');
+            // Opcional: mudar texto do botão para indicar carregamento
+            if (notificationsButton.style.display !== 'none') {
+                notificationsButton.innerText = 'Redirecionando...';
+                notificationsButton.disabled = true;
+            }
             window.location.href = '/app';
+        }
+
+        // Lógica do clique no primeiro botão (Instalar ou Continuar)
+        installButton.addEventListener('click', async () => {
+            if (isInstallable && window.deferredPrompt) {
+                console.log('[welcome] Mostrando prompt de instalação...');
+                window.deferredPrompt.prompt();
+                const { outcome } = await window.deferredPrompt.userChoice;
+                console.log(`[welcome] Resultado da instalação: ${outcome}`);
+                window.deferredPrompt = null;
+            }
+            // Após a interação (ou se não for instalável), avança para a próxima etapa.
+            showNotificationsStep();
         });
+
+        // Lógica do clique no segundo botão (Notificações)
+        notificationsButton.addEventListener('click', async () => {
+            console.log('[welcome] Solicitando permissão de notificação...');
+            try {
+                const permissionResult = await Notification.requestPermission();
+                console.log(`[welcome] Resultado da permissão: ${permissionResult}`);
+                
+                if (permissionResult === 'granted') {
+                    // Se a permissão foi concedida, inscreve o usuário
+                    await subscribeUserToPush();
+                }
+            } catch (error) {
+                console.error('[welcome] Erro ao pedir permissão de notificação:', error);
+            } finally {
+                // Após a interação, redireciona para o app.
+                redirectToApp();
+            }
+        });
+
+        // Função para inscrever o usuário (copiada de script.js)
+        async function subscribeUserToPush() {
+            try {
+                const registration = await navigator.serviceWorker.ready;
+                const VAPID_PUBLIC_KEY_RESPONSE = await fetch('/api/vapid-public-key');
+                if (!VAPID_PUBLIC_KEY_RESPONSE.ok) throw new Error('Falha ao buscar chave VAPID.');
+                
+                const VAPID_PUBLIC_KEY = await VAPID_PUBLIC_KEY_RESPONSE.text();
+                if (!VAPID_PUBLIC_KEY) throw new Error('Chave VAPID vazia.');
+
+                const applicationServerKey = urlBase64ToUint8Array(VAPID_PUBLIC_KEY);
+                const subscription = await registration.pushManager.subscribe({
+                    userVisibleOnly: true,
+                    applicationServerKey: applicationServerKey
+                });
+
+                await fetch('/api/subscribe-push', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(subscription),
+                });
+                console.log('[welcome] Inscrição Push enviada com sucesso.');
+            } catch (error) {
+                console.error('[welcome] Falha ao inscrever para notificações:', error);
+                // Não bloqueia o usuário, apenas loga o erro.
+            }
+        }
+
+        function urlBase64ToUint8Array(base64String) {
+            const padding = '='.repeat((4 - base64String.length % 4) % 4);
+            const base64 = (base64String + padding).replace(/-/g, '+').replace(/_/g, '/');
+            const rawData = window.atob(base64);
+            const outputArray = new Uint8Array(rawData.length);
+            for (let i = 0; i < rawData.length; ++i) {
+                outputArray[i] = rawData.charCodeAt(i);
+            }
+            return outputArray;
+        }
     </script>
 </body>
 </html>
