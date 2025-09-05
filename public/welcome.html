@@ -18,16 +18,13 @@
         <h1 id="welcome-title">Parabéns!</h1>
         <p id="welcome-text">Seja bem-vindo ao Montador de Sermões 3.2. Para a melhor experiência, recomendamos instalar o atalho do aplicativo em seu dispositivo.</p>
         
-        <!-- Botão 1: Instalação -->
         <button id="install-button" class="start-button">Começar a Usar</button>
-        
-        <!-- Botão 2: Notificações -->
         <button id="notifications-button" class="start-button" style="display: none;">Ativar Notificações</button>
 
     </div>
 
     <script>
-        // Versão com todas as correções de UX e lógica
+        // Versão Definitiva com verificação imediata do prompt
 
         const installButton = document.getElementById('install-button');
         const notificationsButton = document.getElementById('notifications-button');
@@ -37,17 +34,22 @@
         let isInstallable = false;
 
         function onAppInstallable() {
+            if (isInstallable) return; // Evita rodar duas vezes
             console.log('[welcome] App é instalável. Atualizando botão 1.');
             isInstallable = true;
             installButton.innerText = 'Instalar App';
         }
         
+        // Ouve por futuras oportunidades de instalação
         window.addEventListener('pwa-installable', onAppInstallable);
+        
+        // ADIÇÃO CRÍTICA: Verifica imediatamente se o prompt já foi capturado na página anterior
+        if (window.deferredPrompt) {
+            onAppInstallable();
+        }
 
         function showNotificationsStep() {
-            console.log('[welcome] Mostrando etapa de notificações.');
             installButton.style.display = 'none';
-            
             if (('serviceWorker' in navigator) && ('PushManager' in window) && (Notification.permission === 'default')) {
                 notificationsButton.style.display = 'block';
                 welcomeTitle.innerText = 'Último Passo!';
@@ -59,17 +61,13 @@
         }
 
         function redirectToApp() {
-            console.log('[welcome] Redirecionando para /app.');
             window.location.href = '/app';
         }
 
         installButton.addEventListener('click', async () => {
             if (isInstallable && window.deferredPrompt) {
-                console.log('[welcome] Mostrando prompt de instalação...');
                 window.deferredPrompt.prompt();
                 const { outcome } = await window.deferredPrompt.userChoice;
-                console.log(`[welcome] Resultado da instalação: ${outcome}`);
-                
                 if (outcome === 'accepted') {
                     window.deferredPrompt = null;
                 }
@@ -78,11 +76,8 @@
         });
 
         notificationsButton.addEventListener('click', async () => {
-            console.log('[welcome] Solicitando permissão de notificação...');
             try {
                 const permissionResult = await Notification.requestPermission();
-                console.log(`[welcome] Resultado da permissão: ${permissionResult}`);
-                
                 if (permissionResult === 'granted') {
                     await subscribeUserToPush();
                 }
@@ -98,22 +93,18 @@
                 const registration = await navigator.serviceWorker.ready;
                 const VAPID_PUBLIC_KEY_RESPONSE = await fetch('/api/vapid-public-key');
                 if (!VAPID_PUBLIC_KEY_RESPONSE.ok) throw new Error('Falha ao buscar chave VAPID.');
-                
                 const VAPID_PUBLIC_KEY = await VAPID_PUBLIC_KEY_RESPONSE.text();
                 if (!VAPID_PUBLIC_KEY) throw new Error('Chave VAPID vazia.');
-
                 const applicationServerKey = urlBase64ToUint8Array(VAPID_PUBLIC_KEY);
                 const subscription = await registration.pushManager.subscribe({
                     userVisibleOnly: true,
                     applicationServerKey: applicationServerKey
                 });
-
                 await fetch('/api/subscribe-push', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify(subscription),
                 });
-                console.log('[welcome] Inscrição Push enviada com sucesso.');
             } catch (error) {
                 console.error('[welcome] Falha ao inscrever para notificações:', error);
             }
