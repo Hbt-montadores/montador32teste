@@ -7,6 +7,7 @@
     <link rel="stylesheet" href="style.css">
     <link rel="manifest" href="/manifest.json">
     
+    <!-- Este script é crucial. Ele captura o prompt de instalação em QUALQUER página -->
     <script src="pwa-installer.js" defer></script>
 </head>
 <body>
@@ -18,75 +19,90 @@
         <h1 id="welcome-title">Parabéns!</h1>
         <p id="welcome-text">Seja bem-vindo ao Montador de Sermões 3.2. Para a melhor experiência, recomendamos instalar o atalho do aplicativo em seu dispositivo.</p>
         
-        <button id="install-button" class="start-button">Começar a Usar</button>
-        <button id="notifications-button" class="start-button" style="display: none;">Ativar Notificações</button>
+        <!-- Botão Único de Ação. O texto dele mudará dinamicamente. -->
+        <button id="action-button" class="start-button">Começar a Usar</button>
 
     </div>
 
     <script>
-        // Versão Definitiva com verificação imediata do prompt
+        // Lógica final, robusta, baseada no clique do usuário e no estado das permissões.
 
-        const installButton = document.getElementById('install-button');
-        const notificationsButton = document.getElementById('notifications-button');
+        const actionButton = document.getElementById('action-button');
         const welcomeTitle = document.getElementById('welcome-title');
         const welcomeText = document.getElementById('welcome-text');
 
-        let isInstallable = false;
+        let currentStep = 'start'; // Os passos podem ser: 'start', 'install', 'notify', 'redirect'
 
-        function onAppInstallable() {
-            if (isInstallable) return; // Evita rodar duas vezes
-            console.log('[welcome] App é instalável. Atualizando botão 1.');
-            isInstallable = true;
-            installButton.innerText = 'Instalar App';
-        }
-        
-        // Ouve por futuras oportunidades de instalação
-        window.addEventListener('pwa-installable', onAppInstallable);
-        
-        // ADIÇÃO CRÍTICA: Verifica imediatamente se o prompt já foi capturado na página anterior
-        if (window.deferredPrompt) {
-            onAppInstallable();
-        }
+        // Função que decide o que fazer a seguir, baseada no estado atual
+        async function nextStep() {
+            console.log(`[Welcome] Iniciando nextStep. Passo atual: ${currentStep}`);
 
-        function showNotificationsStep() {
-            installButton.style.display = 'none';
-            if (('serviceWorker' in navigator) && ('PushManager' in window) && (Notification.permission === 'default')) {
-                notificationsButton.style.display = 'block';
-                welcomeTitle.innerText = 'Último Passo!';
-                welcomeText.innerText = 'Clique abaixo para receber atualizações importantes e novidades do Montador de Sermões.';
-                notificationsButton.innerText = 'Ativar';
-            } else {
-                redirectToApp();
+            // === PASSO DE INSTALAÇÃO ===
+            // A variável window.deferredPrompt é preenchida pelo pwa-installer.js (se o navegador permitir)
+            if (window.deferredPrompt) {
+                console.log('[Welcome] Prompt de instalação encontrado. Mostrando...');
+                window.deferredPrompt.prompt();
+                const { outcome } = await window.deferredPrompt.userChoice;
+                console.log(`[Welcome] Resultado da instalação: ${outcome}`);
+                
+                if (outcome === 'accepted') {
+                    window.deferredPrompt = null; // Limpa o prompt pois foi usado
+                }
+                // Após a interação (aceita ou não), vamos para o passo de notificação
+                showNotificationStep();
+                return;
             }
+
+            // === PASSO DE NOTIFICAÇÃO ===
+            // Se chegamos aqui, ou não havia prompt de instalação, ou ele já foi tratado.
+            // Agora verificamos se as notificações são possíveis e ainda não foram permitidas.
+            if (('PushManager' in window) && (Notification.permission === 'default')) {
+                console.log('[Welcome] Mostrando passo de notificação.');
+                showNotificationStep();
+                return;
+            }
+
+            // === PASSO DE REDIRECIONAMENTO ===
+            // Se não há instalação para oferecer E não há notificações para pedir, vamos direto ao app.
+            console.log('[Welcome] Nada a pedir. Redirecionando para /app.');
+            redirectToApp();
+        }
+
+        // Função que muda a UI para a etapa de notificação
+        function showNotificationStep() {
+            welcomeTitle.innerText = 'Último Passo!';
+            welcomeText.innerText = 'Clique abaixo para receber atualizações importantes e novidades do Montador de Sermões.';
+            actionButton.innerText = 'Ativar Notificações';
+            currentStep = 'notify'; // Muda o estado do botão
         }
 
         function redirectToApp() {
             window.location.href = '/app';
         }
 
-        installButton.addEventListener('click', async () => {
-            if (isInstallable && window.deferredPrompt) {
-                window.deferredPrompt.prompt();
-                const { outcome } = await window.deferredPrompt.userChoice;
-                if (outcome === 'accepted') {
-                    window.deferredPrompt = null;
+        // Ouve o clique PRINCIPAL no botão de ação
+        actionButton.addEventListener('click', async () => {
+            if (currentStep === 'start' || currentStep === 'install') {
+                // Na primeira vez que clicamos, verificamos a instalação primeiro.
+                await nextStep();
+            } else if (currentStep === 'notify') {
+                // Se o botão foi clicado quando estava no modo "Ativar Notificações"
+                console.log('[Welcome] Solicitando permissão de notificação...');
+                try {
+                    const permissionResult = await Notification.requestPermission();
+                    console.log(`[Welcome] Resultado da permissão: ${permissionResult}`);
+                    if (permissionResult === 'granted') {
+                        await subscribeUserToPush(); // Tenta inscrever
+                    }
+                } catch (error) {
+                    console.error('[Welcome] Erro ao pedir permissão de notificação:', error);
+                } finally {
+                    redirectToApp(); // Redireciona independente do resultado
                 }
             }
-            showNotificationsStep();
         });
-
-        notificationsButton.addEventListener('click', async () => {
-            try {
-                const permissionResult = await Notification.requestPermission();
-                if (permissionResult === 'granted') {
-                    await subscribeUserToPush();
-                }
-            } catch (error) {
-                console.error('[welcome] Erro ao pedir permissão de notificação:', error);
-            } finally {
-                redirectToApp();
-            }
-        });
+        
+        // --- Funções de Suporte para Notificação ---
 
         async function subscribeUserToPush() {
             try {
@@ -105,8 +121,9 @@
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify(subscription),
                 });
+                console.log('[Welcome] Inscrição Push enviada com sucesso.');
             } catch (error) {
-                console.error('[welcome] Falha ao inscrever para notificações:', error);
+                console.error('[Welcome] Falha ao inscrever para notificações:', error);
             }
         }
 
@@ -120,6 +137,23 @@
             }
             return outputArray;
         }
+
+        // VERIFICAÇÃO INICIAL:
+        // Assim que a página carrega, vamos verificar se o app já é instalável.
+        // Se for, mudamos o texto do botão imediatamente.
+        window.addEventListener('load', () => {
+            // Damos um pequeno delay para o pwa-installer.js (carregado via 'defer') ter tempo de rodar.
+            setTimeout(() => {
+                if (window.deferredPrompt) {
+                    console.log('[Welcome] Prompt de instalação detectado no carregamento.');
+                    actionButton.innerText = 'Instalar App';
+                    currentStep = 'install';
+                } else {
+                    console.log('[Welcome] Nenhum prompt de instalação detectado no carregamento.');
+                }
+            }, 500); // 500ms é um tempo seguro de espera.
+        });
+        
     </script>
 </body>
 </html>
