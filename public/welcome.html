@@ -22,35 +22,47 @@
     </div>
 
     <script>
-        // Lógica final e corrigida para instalação e redirecionamento
+        // Lógica final e robusta para instalação e redirecionamento
 
         const startButton = document.getElementById('start-button');
+        const defaultText = 'Começar a Usar';
+        const installText = 'Instalar e Começar';
 
-        function updateButtonState() {
-            // Agora verificamos window.deferredPrompt, que é preenchido pelo pwa-installer.js
-            if (window.deferredPrompt) {
-                startButton.innerText = 'Instalar e Começar';
-            }
+        // Função para atualizar o botão quando o app for instalável
+        function updateButtonToInstall() {
+            console.log('[welcome.html] Atualizando botão para modo de instalação.');
+            startButton.innerText = installText;
         }
         
-        window.addEventListener('load', () => {
-          setTimeout(updateButtonState, 200);
-        });
+        // Ouve o evento customizado disparado pelo pwa-installer.js
+        // Esta é a forma robusta de saber que o app é instalável.
+        window.addEventListener('pwa-installable', updateButtonToInstall);
 
         startButton.addEventListener('click', async () => {
-            // Se o app for instalável, primeiro mostra o prompt
+            // Verifica a variável global no momento do clique.
             if (window.deferredPrompt) {
+                console.log('[welcome.html] Botão de instalação clicado. Mostrando prompt...');
                 window.deferredPrompt.prompt();
                 
-                // Aguarda a escolha do usuário antes de continuar
                 const { outcome } = await window.deferredPrompt.userChoice;
                 
-                console.log(`Resultado da instalação: ${outcome}`);
+                console.log(`[welcome.html] Resultado da instalação: ${outcome}`);
                 
-                window.deferredPrompt = null; // Limpa a referência
+                // Limpa a referência para que o evento não seja usado novamente.
+                window.deferredPrompt = null;
+                
+                // Se a instalação foi concluída com sucesso ou dispensada,
+                // esperamos um pouco antes de redirecionar para dar tempo de a UI do SO fechar.
+                if (outcome === 'accepted' || outcome === 'dismissed') {
+                    setTimeout(() => {
+                        window.location.href = '/app';
+                    }, 500); // Meio segundo de espera
+                    return; // Impede o redirecionamento imediato abaixo
+                }
             }
             
-            // Sempre redireciona para o app após a tentativa de instalação (ou se não houver prompt)
+            // Se não houver prompt para mostrar, redireciona imediatamente.
+            console.log('[welcome.html] Nenhum prompt de instalação disponível. Redirecionando para /app.');
             window.location.href = '/app';
         });
     </script>
