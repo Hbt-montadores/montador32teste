@@ -24,8 +24,6 @@
         <!-- Botão 2: Notificações -->
         <button id="notifications-button" class="start-button" style="display: none;">Ativar Notificações</button>
 
-        <!-- Link para pular -->
-        <a href="/app" id="skip-link" style="display: block; margin-top: 20px;">Pular por agora</a>
     </div>
 
     <script>
@@ -33,7 +31,6 @@
 
         const installButton = document.getElementById('install-button');
         const notificationsButton = document.getElementById('notifications-button');
-        const skipLink = document.getElementById('skip-link');
         const welcomeTitle = document.getElementById('welcome-title');
         const welcomeText = document.getElementById('welcome-text');
 
@@ -42,7 +39,7 @@
         function onAppInstallable() {
             console.log('[welcome] App é instalável. Atualizando botão 1.');
             isInstallable = true;
-            installButton.innerText = 'Instalar App'; // Correção do Ponto (a)
+            installButton.innerText = 'Instalar App';
         }
         
         window.addEventListener('pwa-installable', onAppInstallable);
@@ -51,11 +48,11 @@
             console.log('[welcome] Mostrando etapa de notificações.');
             installButton.style.display = 'none';
             
-            if (('serviceWorker' in navigator) && ('PushManager' in window) && (Notification.permission !== 'denied')) {
+            if (('serviceWorker' in navigator) && ('PushManager' in window) && (Notification.permission === 'default')) {
                 notificationsButton.style.display = 'block';
                 welcomeTitle.innerText = 'Último Passo!';
                 welcomeText.innerText = 'Clique abaixo para receber atualizações importantes e novidades do Montador de Sermões.';
-                notificationsButton.innerText = 'Ativar'; // Correção do Ponto (d)
+                notificationsButton.innerText = 'Ativar';
             } else {
                 redirectToApp();
             }
@@ -63,7 +60,6 @@
 
         function redirectToApp() {
             console.log('[welcome] Redirecionando para /app.');
-            skipLink.innerText = 'Redirecionando...';
             window.location.href = '/app';
         }
 
@@ -74,8 +70,6 @@
                 const { outcome } = await window.deferredPrompt.userChoice;
                 console.log(`[welcome] Resultado da instalação: ${outcome}`);
                 
-                // Correção do Ponto (b): Só limpa o prompt se a instalação for ACEITA.
-                // Se for ignorada ('dismissed'), o prompt continuará disponível para a página /app.
                 if (outcome === 'accepted') {
                     window.deferredPrompt = null;
                 }
