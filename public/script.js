@@ -1,4 +1,4 @@
-// public/script.js - Versão Final com Correção de Sintaxe no PDF e Notificações Push
+// public/script.js - Versão com correção de UX do botão de notificações
 
 // ===================================================================
 // SEÇÃO 1: LOGGING DE ERROS DO CLIENTE E SERVICE WORKER
@@ -293,7 +293,7 @@ function saveAsPdf() {
 }
 
 // ===================================================================
-// SEÇÃO 3: LÓGICA DE NOTIFICAÇÕES PUSH (NOVO)
+// SEÇÃO 3: LÓGICA DE NOTIFICAÇÕES PUSH
 // ===================================================================
 
 function urlBase64ToUint8Array(base64String) {
@@ -312,35 +312,26 @@ function urlBase64ToUint8Array(base64String) {
 }
 
 async function initializePushNotifications() {
-  if (!('serviceWorker' in navigator) || !('PushManager' in window)) {
-    console.warn('[FRONTEND] Notificações Push não suportadas neste navegador.');
-    if (elements.enableNotificationsButton) {
-      elements.enableNotificationsButton.style.display = 'none';
-    }
+  if (!('serviceWorker' in navigator) || !('PushManager' in window) || !elements.enableNotificationsButton) {
+    return; // Simplesmente não faz nada se não houver suporte ou o botão não existir
+  }
+  
+  // Correção do Ponto (c): Se a permissão já foi concedida, não mostra o botão.
+  if (Notification.permission === 'granted') {
+    console.log('[FRONTEND] Permissão de notificação já concedida. Botão não será exibido.');
+    elements.enableNotificationsButton.style.display = 'none';
     return;
   }
-
+  
   if (Notification.permission === 'denied') {
     console.warn('[FRONTEND] Permissão de notificação negada pelo usuário.');
-    if (elements.enableNotificationsButton) {
-      elements.enableNotificationsButton.style.display = 'none';
-    }
+    elements.enableNotificationsButton.style.display = 'none';
     return;
   }
-
-  if (elements.enableNotificationsButton) {
-    elements.enableNotificationsButton.style.display = 'block';
-    elements.enableNotificationsButton.addEventListener('click', subscribeUserToPush);
-    
-    navigator.serviceWorker.ready.then(async (registration) => {
-        const subscription = await registration.pushManager.getSubscription();
-        if (subscription) {
-            elements.enableNotificationsButton.innerText = 'Notificações Ativadas';
-            elements.enableNotificationsButton.disabled = true;
-            elements.enableNotificationsButton.style.backgroundColor = '#4CAF50';
-        }
-    });
-  }
+  
+  // Se a permissão for 'default' (nem concedida, nem negada), mostra o botão.
+  elements.enableNotificationsButton.style.display = 'block';
+  elements.enableNotificationsButton.addEventListener('click', subscribeUserToPush);
 }
 
 async function subscribeUserToPush() {
@@ -348,14 +339,10 @@ async function subscribeUserToPush() {
     const registration = await navigator.serviceWorker.ready;
     
     const VAPID_PUBLIC_KEY_RESPONSE = await fetch('/api/vapid-public-key');
-    if (!VAPID_PUBLIC_KEY_RESPONSE.ok) {
-        throw new Error('Falha ao buscar a chave VAPID do servidor.');
-    }
+    if (!VAPID_PUBLIC_KEY_RESPONSE.ok) throw new Error('Falha ao buscar a chave VAPID do servidor.');
+    
     const VAPID_PUBLIC_KEY = await VAPID_PUBLIC_KEY_RESPONSE.text();
-
-    if (!VAPID_PUBLIC_KEY) {
-        throw new Error('Chave VAPID recebida do servidor está vazia.');
-    }
+    if (!VAPID_PUBLIC_KEY) throw new Error('Chave VAPID recebida do servidor está vazia.');
 
     const applicationServerKey = urlBase64ToUint8Array(VAPID_PUBLIC_KEY);
     
@@ -375,11 +362,7 @@ async function subscribeUserToPush() {
     if (response.ok) {
       console.log('[FRONTEND] Inscrição Push enviada com sucesso para o servidor.');
       alert('Notificações ativadas com sucesso!');
-      if (elements.enableNotificationsButton) {
-        elements.enableNotificationsButton.innerText = 'Notificações Ativadas';
-        elements.enableNotificationsButton.disabled = true;
-        elements.enableNotificationsButton.style.backgroundColor = '#4CAF50';
-      }
+      elements.enableNotificationsButton.style.display = 'none'; // Esconde o botão após sucesso
     } else {
       const errorText = await response.text();
       console.error('[FRONTEND ERROR] Falha ao enviar a inscrição Push para o servidor:', errorText);
@@ -394,8 +377,6 @@ async function subscribeUserToPush() {
     } else {
       alert(`Erro ao ativar notificações: ${error.message}`);
     }
-    if (elements.enableNotificationsButton) {
-        elements.enableNotificationsButton.style.display = 'none';
-    }
+    elements.enableNotificationsButton.style.display = 'none';
   }
 }
