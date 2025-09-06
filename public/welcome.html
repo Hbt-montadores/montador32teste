@@ -7,6 +7,7 @@
     <link rel="stylesheet" href="style.css">
     <link rel="manifest" href="/manifest.json">
     
+    <!-- Este script é crucial. Ele captura o prompt de instalação em QUALQUER página -->
     <script src="pwa-installer.js" defer></script>
 </head>
 <body>
@@ -18,83 +19,115 @@
         <h1 id="welcome-title">Parabéns!</h1>
         <p id="welcome-text">Seja bem-vindo ao Montador de Sermões 3.2. Para a melhor experiência, recomendamos instalar o atalho do aplicativo em seu dispositivo.</p>
         
+        <!-- Botão Único de Ação. O texto dele mudará dinamicamente. -->
         <button id="action-button" class="start-button">Começar a Usar</button>
     </div>
 
-    <!-- PAINEL DE DEPURAÇÃO -->
-    <div style="max-width: 600px; margin: 20px auto; padding: 15px; border: 2px solid #ccc; background-color: #f9f9f9; text-align: left;">
-        <h3 style="margin-top: 0;">Painel de Status da Instalação</h3>
-        <ul style="list-style-type: none; padding: 0;">
-            <li style="margin-bottom: 8px;">1. Ouvinte Carregado? (`pwa-installer.js`): <strong id="debug-listener-status" style="color: gray;">Aguardando...</strong></li>
-            <li style="margin-bottom: 8px;">2. Evento Disparado? (`beforeinstallprompt`): <strong id="debug-event-status" style="color: orange;">Não</strong></li>
-            <li style="margin-bottom: 8px;">3. Prompt Capturado? (`window.deferredPrompt`): <strong id="debug-capture-status" style="color: orange;">Não</strong></li>
-            <li style="margin-bottom: 8px;">4. Permissão de Notificação?: <strong id="debug-notification-status" style="color: gray;">Verificando...</strong></li>
-        </ul>
-        <small>Este painel é apenas para depuração e será removido posteriormente.</small>
-    </div>
-    <!-- FIM DO PAINEL DE DEPURAÇÃO -->
-
     <script>
-        // Lógica da página com inicialização do painel de depuração
+        // Versão final e limpa, sem o painel de depuração.
 
         const actionButton = document.getElementById('action-button');
+        const welcomeTitle = document.getElementById('welcome-title');
+        const welcomeText = document.getElementById('welcome-text');
 
-        // --- LÓGICA DE DEPURAÇÃO ---
-        function updateNotificationDebugStatus() {
-            const statusEl = document.getElementById('debug-notification-status');
-            const permission = Notification.permission;
-            statusEl.textContent = permission;
-            if (permission === 'granted') {
-                statusEl.style.color = 'green';
-            } else if (permission === 'denied') {
-                statusEl.style.color = 'orange';
-            } else {
-                statusEl.style.color = 'gray';
+        let currentStep = 'start'; // Passos: 'start', 'install', 'notify', 'redirect'
+
+        async function nextStep() {
+            // === PASSO DE INSTALAÇÃO ===
+            if (window.deferredPrompt) {
+                window.deferredPrompt.prompt();
+                const { outcome } = await window.deferredPrompt.userChoice;
+                
+                if (outcome === 'accepted') {
+                    window.deferredPrompt = null; // Limpa o prompt pois foi usado
+                }
+                showNotificationStep();
+                return;
             }
+
+            // === PASSO DE NOTIFICAÇÃO ===
+            if (('PushManager' in window) && (Notification.permission === 'default')) {
+                showNotificationStep();
+                return;
+            }
+
+            // === PASSO DE REDIRECIONAMENTO ===
+            redirectToApp();
         }
-        
-        // --- LÓGICA FUNCIONAL (simplificada para o teste) ---
+
+        function showNotificationStep() {
+            welcomeTitle.innerText = 'Último Passo!';
+            welcomeText.innerText = 'Clique abaixo para receber atualizações importantes e novidades do Montador de Sermões.';
+            actionButton.innerText = 'Ativar Notificações';
+            currentStep = 'notify';
+        }
 
         function redirectToApp() {
             window.location.href = '/app';
         }
 
         actionButton.addEventListener('click', async () => {
-            // No clique, a única coisa que importa é se o prompt FOI capturado
-            if (window.deferredPrompt) {
-                console.log('[Welcome-Debug] Botão clicado, prompt existe. Mostrando...');
-                window.deferredPrompt.prompt();
-                const { outcome } = await window.deferredPrompt.userChoice;
-                console.log(`[Welcome-Debug] Resultado da instalação: ${outcome}`);
-                
-                // Se aceito, limpamos para não oferecer de novo
-                if (outcome === 'accepted') {
-                    window.deferredPrompt = null;
+            if (currentStep === 'start' || currentStep === 'install') {
+                await nextStep();
+            } else if (currentStep === 'notify') {
+                try {
+                    const permissionResult = await Notification.requestPermission();
+                    if (permissionResult === 'granted') {
+                        await subscribeUserToPush();
+                    }
+                } catch (error) {
+                    console.error('[Welcome] Erro ao pedir permissão de notificação:', error);
+                } finally {
+                    redirectToApp();
                 }
-                
-                // Após a interação, redirecionamos
-                setTimeout(redirectToApp, 500);
-
-            } else {
-                console.log('[Welcome-Debug] Botão clicado, mas nenhum prompt para mostrar. Redirecionando...');
-                alert('Nenhuma opção de instalação foi oferecida pelo navegador neste momento. Você será redirecionado para o app.');
-                redirectToApp();
             }
         });
         
-        // --- INICIALIZAÇÃO DA PÁGINA ---
-        window.addEventListener('load', () => {
-            // Inicializa o status da notificação no painel de debug
-            updateNotificationDebugStatus();
+        // --- Funções de Suporte para Notificação ---
 
-            // Verifica a cada segundo se o prompt de instalação foi capturado
-            // Isso ajuda a visualizar qualquer delay do navegador.
-            setInterval(() => {
-                if(window.deferredPrompt && actionButton.innerText !== 'Instalar App') {
+        async function subscribeUserToPush() {
+            try {
+                const registration = await navigator.serviceWorker.ready;
+                const VAPID_PUBLIC_KEY_RESPONSE = await fetch('/api/vapid-public-key');
+                if (!VAPID_PUBLIC_KEY_RESPONSE.ok) throw new Error('Falha ao buscar chave VAPID.');
+                const VAPID_PUBLIC_KEY = await VAPID_PUBLIC_KEY_RESPONSE.text();
+                if (!VAPID_PUBLIC_KEY) throw new Error('Chave VAPID vazia.');
+                const applicationServerKey = urlBase64ToUint8Array(VAPID_PUBLIC_KEY);
+                const subscription = await registration.pushManager.subscribe({
+                    userVisibleOnly: true,
+                    applicationServerKey: applicationServerKey
+                });
+                await fetch('/api/subscribe-push', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(subscription),
+                });
+            } catch (error) {
+                console.error('[Welcome] Falha ao inscrever para notificações:', error);
+            }
+        }
+
+        function urlBase64ToUint8Array(base64String) {
+            const padding = '='.repeat((4 - base64String.length % 4) % 4);
+            const base64 = (base64String + padding).replace(/-/g, '+').replace(/_/g, '/');
+            const rawData = window.atob(base64);
+            const outputArray = new Uint8Array(rawData.length);
+            for (let i = 0; i < rawData.length; ++i) {
+                outputArray[i] = rawData.charCodeAt(i);
+            }
+            return outputArray;
+        }
+
+        // VERIFICAÇÃO INICIAL:
+        window.addEventListener('load', () => {
+            setTimeout(() => {
+                if (window.deferredPrompt) {
                     actionButton.innerText = 'Instalar App';
+                    currentStep = 'install';
                 }
-            }, 1000);
+            }, 500);
         });
+        
     </script>
 </body>
 </html>
