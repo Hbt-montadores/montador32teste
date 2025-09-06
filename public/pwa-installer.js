@@ -1,38 +1,17 @@
-// public/pwa-installer.js - VERSÃO DE DEPURAÇÃO
-
-// Função auxiliar para atualizar o painel de status
-function updateDebugStatus(elementId, text, color) {
-    const element = document.getElementById(elementId);
-    if (element) {
-        element.textContent = text;
-        element.style.color = color;
-    }
-}
-
-// Assim que este script carrega, ele se anuncia no painel.
-// Usamos um pequeno timeout para garantir que o HTML do painel já foi renderizado.
-setTimeout(() => {
-    updateDebugStatus('debug-listener-status', 'Sim', 'green');
-}, 100);
+// public/pwa-installer.js - Versão 5 (Robusta com Evento Customizado)
 
 // Esta variável guardará o evento para que possa ser usado quando o botão for clicado.
 let deferredPrompt;
 
 // Ouve o evento que o navegador dispara quando o app é instalável.
 window.addEventListener('beforeinstallprompt', (e) => {
-  // ATUALIZAÇÃO DE DEBUG: O evento mais importante aconteceu!
-  updateDebugStatus('debug-event-status', 'Sim', 'green');
-  console.log('[pwa-installer-debug] Evento "beforeinstallprompt" DISPARADO.');
-
-  e.preventDefault();
-  deferredPrompt = e;
+  console.log('[pwa-installer] Evento "beforeinstallprompt" capturado.');
+  e.preventDefault(); // Impede o pop-up padrão do navegador.
+  deferredPrompt = e; // Guarda o evento.
+  // Disponibiliza o evento globalmente para outros scripts (como welcome.html)
   window.deferredPrompt = e;
 
-  // ATUALIZAÇÃO DE DEBUG: Confirmamos que o prompt foi salvo na variável.
-  updateDebugStatus('debug-capture-status', 'Sim', 'green');
-  console.log('[pwa-installer-debug] Prompt de instalação CAPTURADO.');
-
-  // Lógica antiga para o botão de instalar na página /app (mantida por segurança)
+  // Encontra o botão de instalação na página /app.
   const installButton = document.getElementById('install-button');
   if (installButton) {
     installButton.style.display = 'block';
@@ -41,10 +20,16 @@ window.addEventListener('beforeinstallprompt', (e) => {
       if (deferredPrompt) {
         deferredPrompt.prompt();
         const { outcome } = await deferredPrompt.userChoice;
-        console.log(`[pwa-installer-debug] Resultado da instalação: ${outcome}`);
+        console.log(`[pwa-installer] Resultado da instalação: ${outcome}`);
         deferredPrompt = null;
         window.deferredPrompt = null;
       }
     });
   }
+  
+  // AVISO ATIVO: Dispara um evento customizado para que outras partes da aplicação
+  // (como a página welcome.html) saibam que o app é instalável agora.
+  // Embora a lógica principal agora esteja no clique, manter isso não causa problemas.
+  console.log('[pwa-installer] Disparando evento "pwa-installable".');
+  window.dispatchEvent(new CustomEvent('pwa-installable'));
 });
