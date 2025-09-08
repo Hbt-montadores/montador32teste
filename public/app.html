@@ -19,14 +19,18 @@
         <header class="app-header">
             <h1>Montador de Sermões 3.2</h1>
             <div class="header-actions">
-                <button id="install-button" class="install-button" style="display: none;">Instalar App</button>
-                <!-- NOVO: Botão para habilitar notificações -->
+                <!-- O botão de notificação continua aqui -->
                 <button id="enable-notifications-button" class="install-button" style="display: none;">Receber Notificações</button>
                 <a href="/logout" class="logout-link">Sair</a>
             </div>
         </header>
 
         <main>
+            <!-- NOVO: Container dedicado para o prompt de instalação -->
+            <div id="install-prompt-container">
+                <button id="install-button" style="display: none;">Atalho para Acesso Fácil</button>
+            </div>
+
             <div id="step-container" style="display: none;">
                 <h2 id="question">Qual será o tema do seu sermão?</h2>
                 <div id="input-area">
@@ -36,9 +40,12 @@
                 <div id="options" style="display: none;"></div>
             </div>
 
+            <!-- MODIFICADO: A tela de loading agora é um overlay completo -->
             <div id="loading" style="display: none;">
                 <div class="loader"></div>
                 <p id="loading-text">Gerando seu sermão, por favor aguarde...</p>
+                <!-- NOVO: Botão de cancelar -->
+                <button id="cancel-sermon-button" class="cancel-button">Cancelar</button>
             </div>
 
             <div id="sermon-result" style="display: none;">
@@ -52,10 +59,7 @@
         </main>
     </div>
 
-    <!-- Biblioteca para gerar PDF no navegador -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
-    
-    <!-- Script principal da aplicação -->
     <script src="script.js"></script>
 </body>
 </html>
