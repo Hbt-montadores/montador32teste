@@ -1,5 +1,3 @@
-// server.js - Versão Final Definitiva com Lógica de Importação Restaurada e Notificações Push
-
 // --- 1. IMPORTAÇÕES E CONFIGURAÇÃO INICIAL ---
 require("dotenv").config();
 const express = require("express");
@@ -16,7 +14,8 @@ const {
     pool, getCustomerRecordByEmail, getCustomerRecordByPhone, getAccessControlRule,
     updateAnnualAccess, updateMonthlyStatus, updateLifetimeAccess, revokeAccessByInvoice,
     logSermonActivity, updateGraceSermons, registerProspect,
-    savePushSubscription, getAllPushSubscriptions
+    savePushSubscription, getAllPushSubscriptions,
+    checkIfUserIsSubscribed, deletePushSubscription // <-- ALTERAÇÃO PASSO 1
 } = require('./db');
 
 const app = express();
@@ -597,40 +596,30 @@ app.get("/admin/view-activity", async (req, res) => {
     }
 });
 
+// ALTERAÇÃO PASSO 3 - ROTA DE ENVIO ATUALIZADA
 app.post("/admin/send-push-notification", async (req, res) => {
     const { key, push_title, push_body, push_url } = req.body;
     if (key !== process.env.ADMIN_KEY) { return res.status(403).send("Acesso Negado"); }
-    if (!push_title || !push_body || !push_url) { return res.status(400).send("Título, corpo e URL são obrigatórios."); }
-
     try {
         const subscriptions = await getAllPushSubscriptions();
-        console.log(`[BACKEND PUSH] Enviando notificação para ${subscriptions.length} dispositivo(s).`);
-
-        const payload = JSON.stringify({
-            title: push_title,
-            body: push_body,
-            url: push_url
-        });
-
+        const payload = JSON.stringify({ title: push_title, body: push_body, url: push_url });
+        
         const sendPromises = subscriptions.map(sub => 
             webpush.sendNotification(sub, payload).catch(err => {
+                // LÓGICA DE AUTOLIMPEZA ATUALIZADA
                 if (err.statusCode === 410) {
-                    console.log('[BACKEND PUSH] Inscrição expirada detectada. Será removida.');
-                    // Lógica para remover a inscrição `sub` do banco.
+                    console.log('[BACKEND PUSH] Inscrição expirada detectada. Removendo...');
+                    return deletePushSubscription(sub); // Deleta a inscrição do banco de dados
                 } else {
-                    console.error('[BACKEND PUSH ERROR] Falha ao enviar notificação:', err.body);
+                    console.error("Falha ao enviar notificação:", err.body);
                 }
             })
         );
         
         await Promise.all(sendPromises);
-
-        console.log('[BACKEND PUSH] Processo de envio de notificações concluído.');
         res.redirect(`/admin/view-data?key=${key}&message=push_sent_ok&count=${subscriptions.length}`);
-
     } catch (error) {
-        console.error("[BACKEND ERROR] Erro ao enviar notificações push:", error);
-        res.status(500).send("Erro interno ao enviar notificações.");
+        res.status(500).send("Erro ao enviar notificações.");
     }
 });
 
@@ -731,6 +720,20 @@ app.post("/api/subscribe-push", requireLogin, async (req, res) => {
     } catch (error) {
         console.error('[BACKEND ERROR] Erro ao salvar inscrição push:', error);
         res.status(500).json({ error: 'Erro ao salvar a inscrição no servidor.' });
+    }
+});
+
+/**
+ * ALTERAÇÃO PASSO 2 - NOVA ROTA: Verifica se o usuário logado já tem uma inscrição de notificação.
+ */
+app.get("/api/check-push-subscription", requireLogin, async (req, res) => {
+    try {
+        const userEmail = req.session.user.email;
+        const isSubscribed = await checkIfUserIsSubscribed(userEmail);
+        res.json({ isSubscribed: isSubscribed });
+    } catch (error) {
+        console.error('[BACKEND ERROR] Falha ao verificar inscrição push:', error);
+        res.status(500).json({ error: 'Erro interno ao verificar a inscrição.' });
     }
 });
 
