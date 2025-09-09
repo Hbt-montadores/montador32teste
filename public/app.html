@@ -19,21 +19,21 @@
         <header class="app-header">
             <h1>Montador de Sermões 3.2</h1>
             <div class="header-actions">
-                <!-- O antigo botão de notificação foi removido daqui -->
                 <a href="/logout" class="logout-link">Sair</a>
             </div>
         </header>
 
         <main>
             <div id="install-prompt-container">
-                <button id="install-button" style="display: none;">Atalho para Acesso Fácil</button>
+                <button id="install-button" class="action-button" style="display: none;">Atalho para Acesso Fácil</button>
             </div>
 
             <div id="step-container" style="display: block;">
                 <h2 id="question">Qual será o tema do seu sermão?</h2>
                 <div id="input-area">
                     <input type="text" id="user-input" placeholder="Ex: A Parábola do Filho Pródigo">
-                    <button onclick="nextStep()">Próximo Passo</button>
+                    <!-- CORRIGIDO: Adicionada a classe "action-button" -->
+                    <button onclick="nextStep()" class="action-button">Próximo Passo</button>
                 </div>
                 <div id="options" style="display: none;"></div>
             </div>
@@ -49,7 +49,7 @@
         </main>
     </div>
 
-    <!-- NOVA ESTRUTURA DO MODAL "SOFT PROMPT" -->
+    <!-- Estrutura do Modal "Soft Prompt" para Notificações -->
     <div id="soft-prompt-overlay" style="display: none;">
         <div id="soft-prompt-modal">
             <h3>Uma Novidade para Você!</h3>
