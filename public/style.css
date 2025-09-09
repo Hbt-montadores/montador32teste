@@ -1,4 +1,4 @@
-/* public/style.css - Versão Final com Modal "Soft Prompt" */
+/* public/style.css - Versão Final com CSS Específico para Botões */
 
 /* Estilos gerais */
 body {
@@ -35,8 +35,8 @@ h1 {
     margin: 0 auto;
 }
 
-/* Rótulo do campo de tema */
-#question {
+/* Labels e Textos */
+.input-label, #question {
     font-size: 1.5em;
     font-weight: bold;
     margin-bottom: 10px;
@@ -44,8 +44,13 @@ h1 {
     color: #0D47A1;
 }
 
-/* Campo de entrada de texto */
-#user-input {
+.warning-text {
+    display: block;
+    margin-bottom: 15px;
+}
+
+/* Campos de entrada de texto */
+.input-field, #user-input {
     width: calc(100% - 24px);
     padding: 15px;
     margin-bottom: 20px;
@@ -56,22 +61,39 @@ h1 {
     box-sizing: border-box;
 }
 
-/* Botões gerais */
-button, .option-button {
-    background-color: #1565C0;
-    color: #fff;
-    padding: 15px;
-    font-size: 1.4em;
+/* BOTÕES: Lógica de Estilo Refatorada */
+
+/* Base para todos os botões para evitar repetição */
+button {
     border: none;
     border-radius: 8px;
     cursor: pointer;
+    font-size: 1.2em;
+}
+
+/* Botões de Ação Principal (largura total) */
+.action-button, .option-button {
+    background-color: #1565C0;
+    color: #fff;
+    padding: 15px;
     width: 100%;
     margin: 10px 0;
     display: block;
 }
 
-button:hover, .option-button:hover {
+.action-button:hover, .option-button:hover {
     background-color: #1E88E5;
+}
+
+/* Botões de Ação Menores (tamanho automático) */
+.sermon-actions button {
+    background-color: #1565C0;
+    color: #fff;
+    width: auto;
+    font-size: 1em;
+    padding: 12px 25px;
+    margin: 0 10px;
+    display: inline-block;
 }
 
 /* Tela de carregamento modal */
@@ -91,7 +113,6 @@ button:hover, .option-button:hover {
     color: #FFFFFF;
 }
 
-/* Spinner circular */
 .loader {
     border: 8px solid rgba(255, 255, 255, 0.3);
     border-top: 8px solid #FFFFFF;
@@ -107,7 +128,6 @@ button:hover, .option-button:hover {
     100% { transform: rotate(360deg); }
 }
 
-/* Botão de cancelar no modal de loading */
 .cancel-button {
     background-color: transparent;
     border: 2px solid rgba(255, 255, 255, 0.7);
@@ -117,12 +137,10 @@ button:hover, .option-button:hover {
     font-size: 0.8em;
     margin-top: 20px;
 }
-
 .cancel-button:hover {
     background-color: rgba(255, 255, 255, 0.1);
 }
 
-/* Conteúdo do sermão gerado */
 #sermon-result {
     text-align: left;
     white-space: normal;
@@ -133,7 +151,6 @@ button:hover, .option-button:hover {
     margin-top: 20px;
 }
 
-/* Botão de instalação aprimorado */
 #install-prompt-container {
     margin-bottom: 20px;
 }
@@ -148,7 +165,6 @@ button:hover, .option-button:hover {
     box-sizing: border-box;
 }
 
-/* Link de Sair */
 .logout-link {
     font-size: 0.9em;
     color: white;
@@ -159,7 +175,6 @@ button:hover, .option-button:hover {
     margin-left: 10px;
 }
 
-/* Header do app.html */
 .app-header {
     display: flex;
     justify-content: space-between;
@@ -171,21 +186,6 @@ button:hover, .option-button:hover {
 .app-header h1 { margin: 0; font-size: 1.8em; }
 .header-actions { display: flex; align-items: center; }
 
-/* Ações do sermão (Salvar, Novo) */
-.sermon-actions {
-    text-align: center;
-    margin-top: 20px;
-}
-
-.sermon-actions button {
-    width: auto;
-    font-size: 1em;
-    padding: 12px 25px;
-    margin: 0 10px;
-    display: inline-block;
-}
-
-/* Container de Erro */
 #error-container {
     padding: 30px;
     background-color: #fff3f3;
@@ -196,7 +196,6 @@ button:hover, .option-button:hover {
     color: #d32f2f;
 }
 
-/* NOVO: ESTILOS PARA O MODAL "SOFT PROMPT" */
 #soft-prompt-overlay {
     position: fixed;
     top: 0;
