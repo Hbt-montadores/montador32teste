@@ -14,15 +14,11 @@ pool.on('error', (err, client) => {
   process.exit(-1);
 });
 
-/**
- * Função auto-executável para inicializar e migrar o banco de dados.
- */
 (async () => {
   const client = await pool.connect();
   try {
     console.log('Verificando e preparando o banco de dados...');
 
-    // --- Tabela 'customers' ---
     await client.query(`
       CREATE TABLE IF NOT EXISTS customers (
         id SERIAL PRIMARY KEY,
@@ -38,13 +34,9 @@ pool.on('error', (err, client) => {
         last_product_id TEXT
       );
     `);
-
-    await client.query(`ALTER TABLE customers ADD COLUMN IF NOT EXISTS last_invoice_id TEXT;`);
-    await client.query(`ALTER TABLE customers ADD COLUMN IF NOT EXISTS last_product_id TEXT;`);
     
-    console.log('✔️ Tabela "customers" pronta e migrada.');
+    console.log('✔️ Tabela "customers" pronta.');
 
-    // --- Tabela 'access_control' ---
     await client.query(`
       CREATE TABLE IF NOT EXISTS access_control (
         id SERIAL PRIMARY KEY,
@@ -58,7 +50,6 @@ pool.on('error', (err, client) => {
     `);
     console.log('✔️ Tabela "access_control" pronta.');
 
-    // --- Tabela 'activity_log' ---
     await client.query(`
       CREATE TABLE IF NOT EXISTS activity_log (
         id SERIAL PRIMARY KEY,
@@ -74,7 +65,6 @@ pool.on('error', (err, client) => {
     `);
     console.log('✔️ Tabela "activity_log" pronta.');
 
-    // --- Tabela 'user_sessions' ---
     await client.query(`
       CREATE TABLE IF NOT EXISTS "user_sessions" (
         "sid" varchar NOT NULL COLLATE "default", "sess" json NOT NULL, "expire" timestamp(6) NOT NULL
@@ -86,19 +76,15 @@ pool.on('error', (err, client) => {
     `);
     console.log('✔️ Tabela "user_sessions" pronta.');
 
-    // ===================================================================
-    // ADIÇÃO: Nova tabela para armazenar as inscrições de Notificação Push
-    // ===================================================================
     await client.query(`
       CREATE TABLE IF NOT EXISTS push_subscriptions (
         id SERIAL PRIMARY KEY,
         user_email TEXT NOT NULL,
-        subscription_object JSONB UNIQUE NOT NULL, -- Endpoint deve ser único
+        subscription_object JSONB UNIQUE NOT NULL,
         created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
       );
     `);
     console.log('✔️ Tabela "push_subscriptions" pronta.');
-    // ===================================================================
 
     console.log('✅ Banco de dados pronto para uso.');
 
@@ -109,9 +95,6 @@ pool.on('error', (err, client) => {
     client.release();
   }
 })();
-
-
-// --- FUNÇÕES DE CONSULTA, MODIFICAÇÃO E LÓGICA INTERNA ---
 
 async function getCustomerRecordByEmail(email) {
   const { rows } = await pool.query(`SELECT * FROM customers WHERE email = $1`, [email.toLowerCase()]);
@@ -210,14 +193,6 @@ async function logSermonActivity(details) {
     );
 }
 
-// ===================================================================
-// ADIÇÃO: Novas funções para gerenciar as inscrições de notificação
-// ===================================================================
-
-/**
- * Salva uma nova inscrição de notificação no banco de dados.
- * Usa ON CONFLICT para evitar duplicatas para o mesmo endpoint.
- */
 async function savePushSubscription(user_email, subscription_object) {
     const query = `
         INSERT INTO push_subscriptions (user_email, subscription_object)
@@ -227,15 +202,10 @@ async function savePushSubscription(user_email, subscription_object) {
     await pool.query(query, [user_email, subscription_object]);
 }
 
-/**
- * Busca todas as inscrições de notificação ativas no banco de dados.
- */
 async function getAllPushSubscriptions() {
     const { rows } = await pool.query(`SELECT subscription_object FROM push_subscriptions`);
     return rows.map(row => row.subscription_object);
 }
-// ===================================================================
-
 
 module.exports = {
   pool,
@@ -249,7 +219,6 @@ module.exports = {
   registerProspect,
   updateGraceSermons,
   logSermonActivity,
-  // Exporta as novas funções
   savePushSubscription,
   getAllPushSubscriptions
 };
