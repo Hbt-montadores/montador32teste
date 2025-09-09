@@ -1,4 +1,4 @@
-// db.js - Versão Final com Tabela de Notificações Push
+// db.js - Versão Final com Funções de Verificação e Deleção de Inscrições
 
 const { Pool } = require('pg');
 
@@ -95,6 +95,8 @@ pool.on('error', (err, client) => {
     client.release();
   }
 })();
+
+// --- Funções de Consulta e Modificação (Clientes e Acesso) ---
 
 async function getCustomerRecordByEmail(email) {
   const { rows } = await pool.query(`SELECT * FROM customers WHERE email = $1`, [email.toLowerCase()]);
@@ -193,6 +195,8 @@ async function logSermonActivity(details) {
     );
 }
 
+// --- Funções de Gerenciamento de Notificações Push ---
+
 async function savePushSubscription(user_email, subscription_object) {
     const query = `
         INSERT INTO push_subscriptions (user_email, subscription_object)
@@ -207,6 +211,27 @@ async function getAllPushSubscriptions() {
     return rows.map(row => row.subscription_object);
 }
 
+/**
+ * NOVO: Verifica se um usuário já tem uma inscrição de notificação salva.
+ * Retorna true se houver pelo menos uma inscrição, false caso contrário.
+ */
+async function checkIfUserIsSubscribed(user_email) {
+    const query = `SELECT 1 FROM push_subscriptions WHERE user_email = $1 LIMIT 1`;
+    const { rows } = await pool.query(query, [user_email]);
+    return rows.length > 0;
+}
+
+/**
+ * NOVO: Deleta uma inscrição de notificação específica do banco de dados.
+ * O objeto de inscrição é usado como identificador único.
+ */
+async function deletePushSubscription(subscription_object) {
+    const query = `DELETE FROM push_subscriptions WHERE subscription_object = $1`;
+    await pool.query(query, [subscription_object]);
+    console.log('[DB] Inscrição expirada removida do banco de dados.');
+}
+
+
 module.exports = {
   pool,
   getCustomerRecordByEmail,
@@ -220,5 +245,8 @@ module.exports = {
   updateGraceSermons,
   logSermonActivity,
   savePushSubscription,
-  getAllPushSubscriptions
+  getAllPushSubscriptions,
+  // Exporta as novas funções
+  checkIfUserIsSubscribed,
+  deletePushSubscription
 };
