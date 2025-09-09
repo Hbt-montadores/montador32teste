@@ -1,4 +1,4 @@
-// public/script.js - Versão com Modal de Loading Aprimorado
+// public/script.js - Versão Final com Modal "Soft Prompt"
 
 // ===================================================================
 // SEÇÃO 1: LOGGING E SERVICE WORKER
@@ -42,7 +42,7 @@ let currentStep = 1;
 let elements = {};
 let loadingInterval;
 let sermonData = {};
-let sermonGenerationController; // NOVO: Para permitir o cancelamento
+let sermonGenerationController;
 
 const longSermonMessages = [
     "Consultando as referências e o contexto bíblico...",
@@ -68,14 +68,17 @@ window.addEventListener('load', () => {
         loadingText: document.getElementById('loading-text'),
         sermonResult: document.getElementById('sermon-result'),
         errorContainer: document.getElementById('error-container'),
-        enableNotificationsButton: document.getElementById('enable-notifications-button'),
-        cancelSermonButton: document.getElementById('cancel-sermon-button')
+        cancelSermonButton: document.getElementById('cancel-sermon-button'),
+        // Elementos do Soft Prompt
+        softPromptOverlay: document.getElementById('soft-prompt-overlay'),
+        softPromptYes: document.getElementById('soft-prompt-yes'),
+        softPromptNo: document.getElementById('soft-prompt-no'),
     };
     
-    // NOVO: Adiciona o listener para o botão de cancelar
     elements.cancelSermonButton.addEventListener('click', cancelSermonGeneration);
 
     startNewSermon();
+    // A inicialização das notificações agora usa o Soft Prompt.
     initializePushNotifications();
   }
 });
@@ -142,18 +145,15 @@ function nextStep(response) {
     }
   }
 
-  if(currentStep === 1) sermonData.topic = userResponse;
-  if(currentStep === 2) sermonData.audience = userResponse;
-  if(currentStep === 3) sermonData.sermonType = userResponse;
-  if(currentStep === 4) sermonData.duration = userResponse;
+  sermonData[`step${currentStep}`] = userResponse;
 
   if (currentStep === 4) {
-    generateSermon(userResponse);
+    generateSermon();
     return;
   }
   
   elements.stepContainer.style.display = 'none';
-  elements.loading.style.display = 'block';
+  elements.loading.style.display = 'flex';
 
   fetch('/api/next-step', {
     method: 'POST',
@@ -190,26 +190,25 @@ function displayQuestion(data) {
   elements.stepContainer.style.display = 'block';
 }
 
-// MODIFICADO: Lógica de geração de sermão com as melhorias
-function generateSermon(userResponse) {
+function generateSermon() {
   elements.stepContainer.style.display = 'none';
-  elements.loading.style.display = 'flex'; // Usar flex para centralizar o conteúdo
+  elements.loading.style.display = 'flex';
 
-  sermonGenerationController = new AbortController(); // Cria um novo controlador para esta requisição
+  sermonGenerationController = new AbortController();
 
+  const duration = sermonData.step4;
   const longSermonTriggers = ["Entre 40 e 50 min", "Entre 50 e 60 min", "Acima de 1 hora"];
-  if (longSermonTriggers.includes(userResponse)) {
+  if (longSermonTriggers.includes(duration)) {
     let messageIndex = 0;
     const totalSteps = longSermonMessages.length;
     
-    // Função para atualizar o texto com o progresso
     const updateLoadingText = () => {
         const progressText = `Passo ${messageIndex + 1} de ${totalSteps}:`;
         elements.loadingText.innerHTML = `${progressText}<br>${longSermonMessages[messageIndex]}`;
         messageIndex = (messageIndex + 1) % totalSteps;
     };
     
-    updateLoadingText(); // Mostra a primeira mensagem imediatamente
+    updateLoadingText();
     loadingInterval = setInterval(updateLoadingText, 7000);
 
   } else {
@@ -219,8 +218,8 @@ function generateSermon(userResponse) {
   fetch('/api/next-step', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ step: 4, userResponse: userResponse }),
-    signal: sermonGenerationController.signal // Associa o controlador à requisição
+    body: JSON.stringify({ step: 4, userResponse: duration }),
+    signal: sermonGenerationController.signal
   })
   .then(res => {
       clearInterval(loadingInterval);
@@ -244,99 +243,83 @@ function generateSermon(userResponse) {
   .catch(handleFetchError);
 }
 
-// NOVO: Função para cancelar a geração do sermão
 function cancelSermonGeneration() {
     if (sermonGenerationController) {
         sermonGenerationController.abort();
     }
 }
 
-
 function saveAsPdf() {
   const sermonContent = document.querySelector('.sermon-content');
-  if (!sermonContent) {
-    logErrorToServer('error', '[FRONTEND ERROR] Elemento .sermon-content não encontrado.');
-    return;
-  }
+  if (!sermonContent) return;
   
   try {
     const { jsPDF } = window.jspdf;
     const doc = new jsPDF({ orientation: 'p', unit: 'mm', format: 'a4' });
-
-    const htmlContent = sermonContent.innerHTML;
     const margin = 10;
-    const fontSize = 16;
-    const lineHeight = 8;
     const usableWidth = doc.internal.pageSize.getWidth() - (margin * 2);
 
-    const textLines = htmlContent.replace(/<strong>(.*?)<\/strong>/g, 'NEG:$1:NEG').split('<br>');
-    let y = margin;
-
     doc.setFont('Helvetica', 'normal');
-    doc.setFontSize(fontSize);
+    doc.setFontSize(12);
 
-    textLines.forEach(line => {
-      const segments = line.split(/NEG:|:NEG/);
-      let isBold = false;
-      
-      segments.forEach(segment => {
-        if (!segment) return;
-        doc.setFont('Helvetica', isBold ? 'bold' : 'normal');
-        const splitText = doc.splitTextToSize(segment, usableWidth);
-        
-        splitText.forEach(textLine => {
-          if (y + lineHeight > doc.internal.pageSize.getHeight() - margin) {
-            doc.addPage();
-            y = margin;
-          }
-          doc.text(textLine, margin, y);
-          y += lineHeight;
-        });
-        isBold = !isBold;
-      });
-    });
+    const text = sermonContent.innerText;
+    const lines = doc.splitTextToSize(text, usableWidth);
+    doc.text(lines, margin, margin);
 
-    let fileName = (sermonData.topic || 'meu_sermao').replace(/[\\/:*?"<>|]/g, '').trim().substring(0, 50);
+    let fileName = (sermonData.step1 || 'meu_sermao').replace(/[\\/:*?"<>|]/g, '').trim().substring(0, 50);
     doc.save(`${fileName}.pdf`);
-    logErrorToServer('info', `[FRONTEND INFO] Sermão "${fileName}.pdf" salvo.`);
-
   } catch (error) {
-    console.error('[FRONTEND ERROR] Erro ao gerar PDF:', error);
     logErrorToServer('error', `[FRONTEND ERROR] Falha ao gerar PDF: ${error.message}`);
-    alert('Ocorreu um erro ao gerar o PDF. Tente salvar o texto manualmente.');
+    alert('Ocorreu um erro ao gerar o PDF.');
   }
 }
 
 // ===================================================================
-// SEÇÃO 3: LÓGICA DE NOTIFICAÇÕES PUSH
+// SEÇÃO 3: LÓGICA DE NOTIFICAÇÕES COM "SOFT PROMPT"
 // ===================================================================
 
-function urlBase64ToUint8Array(base64String) {
-  const padding = '='.repeat((4 - base64String.length % 4) % 4);
-  const base64 = (base64String + padding).replace(/-/g, '+').replace(/_/g, '/');
-  const rawData = window.atob(base64);
-  const outputArray = new Uint8Array(rawData.length);
-  for (let i = 0; i < rawData.length; ++i) {
-    outputArray[i] = rawData.charCodeAt(i);
+function initializePushNotifications() {
+  if (!('serviceWorker' in navigator) || !('PushManager' in window) || !elements.softPromptOverlay) {
+    return; // Não executa se o navegador não suportar ou o modal não existir.
   }
-  return outputArray;
+
+  // Só mostra o prompt se a permissão for 'default' (nem permitida, nem negada).
+  if (Notification.permission === 'default') {
+    // Atraso de 2 segundos para não ser a primeira coisa que o usuário vê.
+    setTimeout(() => {
+        elements.softPromptOverlay.style.display = 'flex';
+    }, 2000);
+  }
+
+  // Adiciona os listeners para os botões do modal.
+  elements.softPromptYes.addEventListener('click', handleSoftPromptAccept);
+  elements.softPromptNo.addEventListener('click', () => {
+    elements.softPromptOverlay.style.display = 'none';
+  });
 }
 
-async function initializePushNotifications() {
-  if (!('serviceWorker' in navigator) || !('PushManager' in window) || !elements.enableNotificationsButton) {
-    return;
+async function handleSoftPromptAccept() {
+  // 1. Esconde o nosso modal.
+  elements.softPromptOverlay.style.display = 'none';
+
+  try {
+    // 2. Aciona o pop-up REAL do navegador.
+    const permissionResult = await Notification.requestPermission();
+    
+    // 3. Se o usuário permitir, inscrevemos ele.
+    if (permissionResult === 'granted') {
+      await subscribeUserToServer();
+      alert('Notificações ativadas com sucesso!');
+    } else {
+      // Se ele negar no pop-up real, não fazemos nada. O navegador se lembrará.
+      console.log('Permissão de notificação não concedida.');
+    }
+  } catch (error) {
+    logErrorToServer('error', `[FRONTEND PUSH ERROR] ${error.message}`);
   }
-  
-  if (Notification.permission === 'granted' || Notification.permission === 'denied') {
-    elements.enableNotificationsButton.style.display = 'none';
-    return;
-  }
-  
-  elements.enableNotificationsButton.style.display = 'block';
-  elements.enableNotificationsButton.addEventListener('click', subscribeUserToPush);
 }
 
-async function subscribeUserToPush() {
+async function subscribeUserToServer() {
   try {
     const registration = await navigator.serviceWorker.ready;
     
@@ -359,20 +342,23 @@ async function subscribeUserToPush() {
       body: JSON.stringify(subscription),
     });
 
-    if (response.ok) {
-      alert('Notificações ativadas com sucesso!');
-      elements.enableNotificationsButton.style.display = 'none';
-    } else {
+    if (!response.ok) {
       throw new Error('Falha ao enviar inscrição para o servidor.');
     }
+    console.log('[FRONTEND] Inscrição Push enviada com sucesso.');
 
   } catch (error) {
     logErrorToServer('error', `[FRONTEND PUSH ERROR] ${error.message}`);
-    if (Notification.permission === 'denied') {
-      alert('Você negou a permissão para notificações. Para ativá-las, mude as configurações do seu navegador.');
-    } else {
-      alert(`Erro ao ativar notificações: ${error.message}`);
-    }
-    elements.enableNotificationsButton.style.display = 'none';
   }
+}
+
+function urlBase64ToUint8Array(base64String) {
+  const padding = '='.repeat((4 - base64String.length % 4) % 4);
+  const base64 = (base64String + padding).replace(/-/g, '+').replace(/_/g, '/');
+  const rawData = window.atob(base64);
+  const outputArray = new Uint8Array(rawData.length);
+  for (let i = 0; i < rawData.length; ++i) {
+    outputArray[i] = rawData.charCodeAt(i);
+  }
+  return outputArray;
 }
