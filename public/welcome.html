@@ -1,138 +1,67 @@
 <!DOCTYPE html>
-<html lang="pt-br">
+<html lang="pt-BR">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Bem-vindo! - Montador de Sermões 3.2</title>
-    <link rel="stylesheet" href="style.css">
-    <link rel="manifest" href="/manifest.json">
+    <title>Montador de Sermões 3.2</title>
     
+    <meta name="theme-color" content="#2196F3">
+    <link rel="manifest" href="manifest.json">
+    <link rel="apple-touch-icon" href="images/icons/icon-192x192.png">
+
     <script src="pwa-installer.js" defer></script>
+    
+    <link rel="stylesheet" href="style.css">
 </head>
 <body>
-    <header>
-        <img src="https://cdn.glitch.global/db74bd9b-d683-421c-9223-f55b917c9dce/logo.png?v=1734385573934" alt="Logo do Montador de Sermões 3.2" class="logo">
-    </header>
-    
-    <div class="welcome-container">
-        <h1 id="welcome-title">Parabéns!</h1>
-        <p id="welcome-text">Seja bem-vindo ao Montador de Sermões 3.2. Para a melhor experiência, recomendamos instalar o atalho do aplicativo em seu dispositivo.</p>
-        
-        <!-- CORRIGIDO: Adicionada a classe "action-button" -->
-        <button id="action-button" class="action-button">Começar a Usar</button>
-        
-        <!-- CORRIGIDO: Adicionada a classe "action-button" -->
-        <button id="notifications-button" class="action-button" style="display: none;">Ativar Notificações</button>
+
+    <div class="container">
+        <header class="app-header">
+            <h1>Montador de Sermões 3.2</h1>
+            <div class="header-actions">
+                <a href="/logout" class="logout-link">Sair</a>
+            </div>
+        </header>
+
+        <main>
+            <div id="install-prompt-container">
+                <button id="install-button" class="action-button" style="display: none;">Atalho para Acesso Fácil</button>
+            </div>
+
+            <div id="step-container" style="display: block;">
+                <h2 id="question">Qual será o tema do seu sermão?</h2>
+                <div id="input-area">
+                    <input type="text" id="user-input" placeholder="Ex: A Parábola do Filho Pródigo">
+                    <!-- CORRIGIDO: Adicionada a classe "action-button" -->
+                    <button onclick="nextStep()" class="action-button">Próximo Passo</button>
+                </div>
+                <div id="options" style="display: none;"></div>
+            </div>
+
+            <div id="loading" style="display: none;">
+                <div class="loader"></div>
+                <p id="loading-text">Gerando seu sermão, por favor aguarde...</p>
+                <button id="cancel-sermon-button" class="cancel-button">Cancelar</button>
+            </div>
+
+            <div id="sermon-result" style="display: none;"></div>
+            <div id="error-container" style="display: none;"></div>
+        </main>
     </div>
 
-    <script>
-        // Lógica final, robusta, baseada no clique do usuário e no estado das permissões.
+    <!-- Estrutura do Modal "Soft Prompt" para Notificações -->
+    <div id="soft-prompt-overlay" style="display: none;">
+        <div id="soft-prompt-modal">
+            <h3>Uma Novidade para Você!</h3>
+            <p>Quer ser o primeiro a saber sobre novos recursos e atualizações importantes? Ative as notificações do Montador de Sermões.</p>
+            <div class="soft-prompt-actions">
+                <button id="soft-prompt-yes" class="soft-prompt-button primary">Sim, quero receber avisos!</button>
+                <button id="soft-prompt-no" class="soft-prompt-button secondary">Agora não</button>
+            </div>
+        </div>
+    </div>
 
-        const actionButton = document.getElementById('action-button');
-        const welcomeTitle = document.getElementById('welcome-title');
-        const welcomeText = document.getElementById('welcome-text');
-
-        let currentStep = 'start'; // Os passos podem ser: 'start', 'install', 'notify', 'redirect'
-
-        // Função que decide o que fazer a seguir, baseada no estado atual
-        async function nextStep() {
-            // === PASSO DE INSTALAÇÃO ===
-            if (window.deferredPrompt) {
-                window.deferredPrompt.prompt();
-                const { outcome } = await window.deferredPrompt.userChoice;
-                
-                if (outcome === 'accepted') {
-                    window.deferredPrompt = null; // Limpa o prompt pois foi usado
-                }
-                showNotificationStep();
-                return;
-            }
-
-            // === PASSO DE NOTIFICAÇÃO ===
-            if (('PushManager' in window) && (Notification.permission === 'default')) {
-                showNotificationStep();
-                return;
-            }
-
-            // === PASSO DE REDIRECIONAMENTO ===
-            redirectToApp();
-        }
-
-        // Função que muda a UI para a etapa de notificação
-        function showNotificationStep() {
-            welcomeTitle.innerText = 'Último Passo!';
-            welcomeText.innerText = 'Clique abaixo para receber atualizações importantes e novidades do Montador de Sermões.';
-            actionButton.innerText = 'Ativar Notificações';
-            currentStep = 'notify';
-        }
-
-        function redirectToApp() {
-            window.location.href = '/app';
-        }
-
-        // Ouve o clique PRINCIPAL no botão de ação
-        actionButton.addEventListener('click', async () => {
-            if (currentStep === 'start' || currentStep === 'install') {
-                await nextStep();
-            } else if (currentStep === 'notify') {
-                try {
-                    const permissionResult = await Notification.requestPermission();
-                    if (permissionResult === 'granted') {
-                        await subscribeUserToPush(); // Tenta inscrever
-                    }
-                } catch (error) {
-                    console.error('[Welcome] Erro ao pedir permissão de notificação:', error);
-                } finally {
-                    redirectToApp(); // Redireciona independente do resultado
-                }
-            }
-        });
-        
-        // --- Funções de Suporte para Notificação ---
-
-        async function subscribeUserToPush() {
-            try {
-                const registration = await navigator.serviceWorker.ready;
-                const VAPID_PUBLIC_KEY_RESPONSE = await fetch('/api/vapid-public-key');
-                if (!VAPID_PUBLIC_KEY_RESPONSE.ok) throw new Error('Falha ao buscar chave VAPID.');
-                const VAPID_PUBLIC_KEY = await VAPID_PUBLIC_KEY_RESPONSE.text();
-                if (!VAPID_PUBLIC_KEY) throw new Error('Chave VAPID vazia.');
-                const applicationServerKey = urlBase64ToUint8Array(VAPID_PUBLIC_KEY);
-                const subscription = await registration.pushManager.subscribe({
-                    userVisibleOnly: true,
-                    applicationServerKey: applicationServerKey
-                });
-                await fetch('/api/subscribe-push', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify(subscription),
-                });
-            } catch (error) {
-                console.error('[Welcome] Falha ao inscrever para notificações:', error);
-            }
-        }
-
-        function urlBase64ToUint8Array(base64String) {
-            const padding = '='.repeat((4 - base64String.length % 4) % 4);
-            const base64 = (base64String + padding).replace(/-/g, '+').replace(/_/g, '/');
-            const rawData = window.atob(base64);
-            const outputArray = new Uint8Array(rawData.length);
-            for (let i = 0; i < rawData.length; ++i) {
-                outputArray[i] = rawData.charCodeAt(i);
-            }
-            return outputArray;
-        }
-
-        // VERIFICAÇÃO INICIAL:
-        window.addEventListener('load', () => {
-            setTimeout(() => {
-                if (window.deferredPrompt) {
-                    actionButton.innerText = 'Instalar App';
-                    currentStep = 'install';
-                }
-            }, 500);
-        });
-        
-    </script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+    <script src="script.js"></script>
 </body>
 </html>
