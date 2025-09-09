@@ -273,10 +273,9 @@ function saveAsPdf() {
 }
 
 // ===================================================================
-// SEÇÃO 3: LÓGICA DE NOTIFICAÇÕES COM "SOFT PROMPT"
+// SEÇÃO 3: LÓGICA DE NOTIFICAÇÕES COM "SOFT PROMPT" INTELIGENTE
 // ===================================================================
 
-// ***** FUNÇÃO ATUALIZADA *****
 async function initializePushNotifications() {
   if (!('serviceWorker' in navigator) || !('PushManager' in window) || !elements.softPromptOverlay) {
     return; // Não executa se o navegador não suportar ou o modal não existir.
@@ -284,8 +283,8 @@ async function initializePushNotifications() {
 
   const permission = Notification.permission;
 
+  // Se a permissão já foi concedida, PERGUNTE AO SERVIDOR se o usuário já está inscrito.
   if (permission === 'granted') {
-    // Se a permissão já foi dada, PERGUNTE AO SERVIDOR se o usuário já está inscrito.
     try {
         const response = await fetch('/api/check-push-subscription');
         const data = await response.json();
@@ -311,7 +310,6 @@ async function initializePushNotifications() {
   });
 }
 
-// ***** FUNÇÃO ATUALIZADA *****
 async function handleSoftPromptAccept() {
   // 1. Esconde o nosso modal.
   elements.softPromptOverlay.style.display = 'none';
