@@ -1,5 +1,3 @@
-// public/script.js - Versão Final com Modal "Soft Prompt"
-
 // ===================================================================
 // SEÇÃO 1: LOGGING E SERVICE WORKER
 // ===================================================================
@@ -278,40 +276,59 @@ function saveAsPdf() {
 // SEÇÃO 3: LÓGICA DE NOTIFICAÇÕES COM "SOFT PROMPT"
 // ===================================================================
 
-function initializePushNotifications() {
+// ***** FUNÇÃO ATUALIZADA *****
+async function initializePushNotifications() {
   if (!('serviceWorker' in navigator) || !('PushManager' in window) || !elements.softPromptOverlay) {
     return; // Não executa se o navegador não suportar ou o modal não existir.
   }
 
-  // Só mostra o prompt se a permissão for 'default' (nem permitida, nem negada).
-  if (Notification.permission === 'default') {
-    // Atraso de 2 segundos para não ser a primeira coisa que o usuário vê.
+  const permission = Notification.permission;
+
+  if (permission === 'granted') {
+    // Se a permissão já foi dada, PERGUNTE AO SERVIDOR se o usuário já está inscrito.
+    try {
+        const response = await fetch('/api/check-push-subscription');
+        const data = await response.json();
+        // Só mostra o prompt se o servidor disser que o usuário NÃO está inscrito.
+        if (!data.isSubscribed) {
+            elements.softPromptOverlay.style.display = 'flex';
+        }
+    } catch (error) {
+        console.error('Erro ao verificar a inscrição de notificação:', error);
+    }
+  } else if (permission === 'default') {
+    // Se a permissão ainda não foi pedida, mostra o prompt após um delay.
     setTimeout(() => {
         elements.softPromptOverlay.style.display = 'flex';
     }, 2000);
   }
+  // Se a permissão for 'denied', não fazemos nada.
 
-  // Adiciona os listeners para os botões do modal.
+  // Adiciona os listeners aos botões do modal.
   elements.softPromptYes.addEventListener('click', handleSoftPromptAccept);
   elements.softPromptNo.addEventListener('click', () => {
     elements.softPromptOverlay.style.display = 'none';
   });
 }
 
+// ***** FUNÇÃO ATUALIZADA *****
 async function handleSoftPromptAccept() {
   // 1. Esconde o nosso modal.
   elements.softPromptOverlay.style.display = 'none';
 
   try {
-    // 2. Aciona o pop-up REAL do navegador.
-    const permissionResult = await Notification.requestPermission();
+    let permissionResult = Notification.permission;
+
+    // 2. Só pede a permissão se ela ainda não foi concedida.
+    if (permissionResult === 'default') {
+      permissionResult = await Notification.requestPermission();
+    }
     
-    // 3. Se o usuário permitir, inscrevemos ele.
+    // 3. Se a permissão final for 'granted', inscrevemos o usuário.
     if (permissionResult === 'granted') {
       await subscribeUserToServer();
       alert('Notificações ativadas com sucesso!');
     } else {
-      // Se ele negar no pop-up real, não fazemos nada. O navegador se lembrará.
       console.log('Permissão de notificação não concedida.');
     }
   } catch (error) {
