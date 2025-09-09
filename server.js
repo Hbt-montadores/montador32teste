@@ -10,12 +10,13 @@ const fs = require('fs');
 const csv = require('csv-parser');
 const webpush = require('web-push');
 
+// AÇÃO 1: IMPORTAR NOVAS FUNÇÕES
 const { 
     pool, getCustomerRecordByEmail, getCustomerRecordByPhone, getAccessControlRule,
     updateAnnualAccess, updateMonthlyStatus, updateLifetimeAccess, revokeAccessByInvoice,
     logSermonActivity, updateGraceSermons, registerProspect,
     savePushSubscription, getAllPushSubscriptions,
-    checkIfUserIsSubscribed, deletePushSubscription // <-- ALTERAÇÃO PASSO 1
+    checkIfUserIsSubscribed, deletePushSubscription // <-- ADICIONADAS AQUI
 } = require('./db');
 
 const app = express();
@@ -596,7 +597,7 @@ app.get("/admin/view-activity", async (req, res) => {
     }
 });
 
-// ALTERAÇÃO PASSO 3 - ROTA DE ENVIO ATUALIZADA
+// AÇÃO 3: IMPLEMENTAR AUTOLIMPEZA
 app.post("/admin/send-push-notification", async (req, res) => {
     const { key, push_title, push_body, push_url } = req.body;
     if (key !== process.env.ADMIN_KEY) { return res.status(403).send("Acesso Negado"); }
@@ -723,8 +724,9 @@ app.post("/api/subscribe-push", requireLogin, async (req, res) => {
     }
 });
 
+// AÇÃO 2: ADICIONAR NOVA ROTA
 /**
- * ALTERAÇÃO PASSO 2 - NOVA ROTA: Verifica se o usuário logado já tem uma inscrição de notificação.
+ * NOVA ROTA: Verifica se o usuário logado já tem uma inscrição de notificação.
  */
 app.get("/api/check-push-subscription", requireLogin, async (req, res) => {
     try {
