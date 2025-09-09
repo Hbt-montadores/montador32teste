@@ -1,4 +1,4 @@
-/* public/style.css - Versão com Modal de Loading e Botão de Instalação Aprimorado */
+/* public/style.css - Versão Final com Modal "Soft Prompt" */
 
 /* Estilos gerais */
 body {
@@ -26,7 +26,7 @@ h1 {
 }
 
 /* Container principal */
-#form-container, #options-container, #login-container, .container {
+.container {
     background-color: #FFFFFF;
     padding: 30px;
     border-radius: 15px;
@@ -36,7 +36,7 @@ h1 {
 }
 
 /* Rótulo do campo de tema */
-.input-label, #question {
+#question {
     font-size: 1.5em;
     font-weight: bold;
     margin-bottom: 10px;
@@ -45,7 +45,7 @@ h1 {
 }
 
 /* Campo de entrada de texto */
-.input-field, #user-input {
+#user-input {
     width: calc(100% - 24px);
     padding: 15px;
     margin-bottom: 20px;
@@ -74,27 +74,25 @@ button:hover, .option-button:hover {
     background-color: #1E88E5;
 }
 
-/* MODIFICADO: Tela de carregamento agora é um overlay modal */
+/* Tela de carregamento modal */
 #loading {
     position: fixed;
     top: 0;
     left: 0;
     width: 100%;
     height: 100%;
-    background-color: rgba(13, 71, 161, 0.85); /* Fundo mais escuro para foco */
-    z-index: 9999;
-    
+    background-color: rgba(13, 71, 161, 0.85);
+    z-index: 10000;
     display: flex;
     flex-direction: column;
     align-items: center;
     justify-content: center;
-    
     font-size: 1.6em;
-    color: #FFFFFF; /* Texto branco para contraste */
+    color: #FFFFFF;
 }
 
 /* Spinner circular */
-.loader, .spinner {
+.loader {
     border: 8px solid rgba(255, 255, 255, 0.3);
     border-top: 8px solid #FFFFFF;
     border-radius: 50%;
@@ -109,6 +107,21 @@ button:hover, .option-button:hover {
     100% { transform: rotate(360deg); }
 }
 
+/* Botão de cancelar no modal de loading */
+.cancel-button {
+    background-color: transparent;
+    border: 2px solid rgba(255, 255, 255, 0.7);
+    color: rgba(255, 255, 255, 0.9);
+    width: auto;
+    padding: 10px 20px;
+    font-size: 0.8em;
+    margin-top: 20px;
+}
+
+.cancel-button:hover {
+    background-color: rgba(255, 255, 255, 0.1);
+}
+
 /* Conteúdo do sermão gerado */
 #sermon-result {
     text-align: left;
@@ -116,52 +129,26 @@ button:hover, .option-button:hover {
     line-height: 1.8;
     font-size: 1.5em;
     color: #0D47A1;
-    background-color: #FFFFFF;
     padding: 20px;
-    border-radius: 15px;
-    box-shadow: 0 4px 10px rgba(0, 0, 0, 0.1);
-    margin: 20px auto;
-    max-width: 800px;
+    margin-top: 20px;
 }
 
-/* NOVO: Estilos para o container e o botão de instalação aprimorado */
+/* Botão de instalação aprimorado */
 #install-prompt-container {
     margin-bottom: 20px;
 }
 
 #install-button {
-    background-color: #4CAF50; /* Verde, para chamar a atenção */
+    background-color: #4CAF50;
     color: white;
     font-weight: bold;
-    font-size: 1.2em; /* Um pouco menor que os botões de ação */
+    font-size: 1.2em;
     padding: 15px;
     width: 100%;
     box-sizing: border-box;
-    border: none;
-    border-radius: 8px;
-    cursor: pointer;
 }
 
-#install-button:hover {
-    background-color: #45a049;
-}
-
-
-/* Botão de Notificação no cabeçalho (continua pequeno) */
-.install-button {
-    padding: 8px 12px;
-    font-size: 0.9em;
-    background-color: #FF9800; /* Laranja para diferenciar */
-    color: white;
-    border: none;
-    border-radius: 5px;
-    cursor: pointer;
-    box-shadow: 0 2px 4px rgba(0,0,0,0.2);
-    width: auto;
-    margin-left: 10px;
-}
-
-/* Botão/Link de Sair */
+/* Link de Sair */
 .logout-link {
     font-size: 0.9em;
     color: white;
@@ -170,10 +157,6 @@ button:hover, .option-button:hover {
     border-radius: 5px;
     text-decoration: none;
     margin-left: 10px;
-}
-
-.logout-link:hover {
-    background-color: rgba(211, 47, 47, 0.9);
 }
 
 /* Header do app.html */
@@ -202,22 +185,6 @@ button:hover, .option-button:hover {
     display: inline-block;
 }
 
-/* NOVO: Estilo para o botão de cancelar no modal de loading */
-.cancel-button {
-    background-color: transparent;
-    border: 2px solid rgba(255, 255, 255, 0.7);
-    color: rgba(255, 255, 255, 0.9);
-    width: auto;
-    padding: 10px 20px;
-    font-size: 0.8em;
-    margin-top: 20px;
-}
-
-.cancel-button:hover {
-    background-color: rgba(255, 255, 255, 0.1);
-}
-
-
 /* Container de Erro */
 #error-container {
     padding: 30px;
@@ -227,4 +194,63 @@ button:hover, .option-button:hover {
 }
 #error-container h2 {
     color: #d32f2f;
+}
+
+/* NOVO: ESTILOS PARA O MODAL "SOFT PROMPT" */
+#soft-prompt-overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background-color: rgba(0, 0, 0, 0.6);
+    z-index: 9998;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+#soft-prompt-modal {
+    background-color: white;
+    padding: 25px;
+    border-radius: 12px;
+    box-shadow: 0 5px 15px rgba(0,0,0,0.3);
+    max-width: 90%;
+    width: 400px;
+    text-align: center;
+}
+
+#soft-prompt-modal h3 {
+    margin-top: 0;
+    font-size: 1.5em;
+    color: #0D47A1;
+}
+
+#soft-prompt-modal p {
+    font-size: 1.1em;
+    line-height: 1.5;
+    margin-bottom: 20px;
+    color: #333;
+}
+
+.soft-prompt-actions .soft-prompt-button {
+    width: 100%;
+    padding: 12px;
+    font-size: 1.1em;
+    font-weight: bold;
+    margin: 5px 0;
+}
+
+.soft-prompt-button.primary {
+    background-color: #1565C0;
+    color: white;
+}
+
+.soft-prompt-button.secondary {
+    background-color: transparent;
+    color: #555;
+    border: none;
+}
+.soft-prompt-button.secondary:hover {
+    background-color: #f0f0f0;
 }
