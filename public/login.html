@@ -6,24 +6,15 @@
     <title>Montador de Sermões - Login</title>
     <link rel="stylesheet" href="style.css">
 
-    <!-- Bloco de código para o App ser instalável (PWA) -->
     <link rel="manifest" href="/manifest.json">
-    <!-- ADIÇÃO CRÍTICA: Carrega o script que captura o evento de instalação -->
     <script src="pwa-installer.js" defer></script>
     <script>
       if ('serviceWorker' in navigator) {
         window.addEventListener('load', () => {
-          navigator.serviceWorker.register('/service-worker.js')
-            .then(registration => {
-              console.log('Service Worker registrado com sucesso na página de login.');
-            })
-            .catch(error => {
-              console.log('Falha ao registrar o Service Worker na página de login:', error);
-            });
+          navigator.serviceWorker.register('/service-worker.js');
         });
       }
     </script>
-    <!-- Fim do Bloco PWA -->
 </head>
 <body>
     <header>
@@ -39,7 +30,8 @@
         
         <input type="email" id="email" name="email" class="input-field" placeholder="Digite o seu email aqui" required>
         
-        <button type="submit" id="login-button">Entrar</button>
+        <!-- MODIFICADO: Adicionada a classe "action-button" para garantir o estilo correto -->
+        <button type="submit" id="login-button" class="action-button">Entrar</button>
     </form>
 
     <script>
