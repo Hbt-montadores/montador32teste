@@ -1,35 +1,44 @@
-// public/pwa-installer.js - Versão 5 (Robusta com Evento Customizado)
+// public/pwa-installer.js - Versão Final e Resiliente
 
-// Esta variável guardará o evento para que possa ser usado quando o botão for clicado.
 let deferredPrompt;
 
-// Ouve o evento que o navegador dispara quando o app é instalável.
-window.addEventListener('beforeinstallprompt', (e) => {
-  console.log('[pwa-installer] Evento "beforeinstallprompt" capturado.');
-  e.preventDefault(); // Impede o pop-up padrão do navegador.
-  deferredPrompt = e; // Guarda o evento.
-  // Disponibiliza o evento globalmente para outros scripts (como welcome.html)
-  window.deferredPrompt = e;
+// Função reutilizável para mostrar o botão de instalação se ele existir na página atual.
+function showInstallButtonIfExists() {
+    // Só executa se o prompt de instalação já foi capturado e guardado.
+    if (window.deferredPrompt) {
+        const installButtonOnAppPage = document.getElementById('install-button');
+        // Verifica se o botão com o ID correto está presente no HTML da página atual.
+        if (installButtonOnAppPage) {
+            console.log('[pwa-installer] Botão de instalação encontrado. Exibindo...');
+            installButtonOnAppPage.style.display = 'block';
+            installButtonOnAppPage.addEventListener('click', () => {
+                if (window.deferredPrompt) {
+                    window.deferredPrompt.prompt();
+                }
+            });
+        }
+    }
+}
 
-  // Encontra o botão de instalação na página /app.
-  const installButton = document.getElementById('install-button');
-  if (installButton) {
-    installButton.style.display = 'block';
-    installButton.addEventListener('click', async () => {
-      installButton.style.display = 'none';
-      if (deferredPrompt) {
-        deferredPrompt.prompt();
-        const { outcome } = await deferredPrompt.userChoice;
-        console.log(`[pwa-installer] Resultado da instalação: ${outcome}`);
-        deferredPrompt = null;
-        window.deferredPrompt = null;
-      }
-    });
-  }
-  
-  // AVISO ATIVO: Dispara um evento customizado para que outras partes da aplicação
-  // (como a página welcome.html) saibam que o app é instalável agora.
-  // Embora a lógica principal agora esteja no clique, manter isso não causa problemas.
-  console.log('[pwa-installer] Disparando evento "pwa-installable".');
-  window.dispatchEvent(new CustomEvent('pwa-installable'));
+// Ouve o evento que o navegador dispara.
+window.addEventListener('beforeinstallprompt', (e) => {
+    console.log('[pwa-installer] Evento "beforeinstallprompt" capturado.');
+    e.preventDefault();
+    
+    // Guarda o evento para ser usado depois.
+    deferredPrompt = e;
+    window.deferredPrompt = e;
+    
+    // Tenta mostrar o botão imediatamente, caso ele já esteja na tela.
+    showInstallButtonIfExists();
+    
+    // Dispara o evento customizado para a página welcome.html.
+    console.log('[pwa-installer] Disparando evento "pwa-installable".');
+    window.dispatchEvent(new CustomEvent('pwa-installable'));
 });
+
+// ADIÇÃO CRÍTICA: Ouve o carregamento de CADA página.
+// Isso garante que, se o evento já foi capturado em uma página anterior (como o login),
+// a função `showInstallButtonIfExists` seja executada novamente na nova página (como a /app),
+// corrigindo o bug.
+window.addEventListener('load', showInstallButtonIfExists);
