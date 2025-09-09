@@ -7,7 +7,6 @@
     <link rel="stylesheet" href="style.css">
     <link rel="manifest" href="/manifest.json">
     
-    <!-- Este script é crucial. Ele captura o prompt de instalação em QUALQUER página -->
     <script src="pwa-installer.js" defer></script>
 </head>
 <body>
@@ -19,19 +18,23 @@
         <h1 id="welcome-title">Parabéns!</h1>
         <p id="welcome-text">Seja bem-vindo ao Montador de Sermões 3.2. Para a melhor experiência, recomendamos instalar o atalho do aplicativo em seu dispositivo.</p>
         
-        <!-- Botão Único de Ação. O texto dele mudará dinamicamente. -->
-        <button id="action-button" class="start-button">Começar a Usar</button>
+        <!-- CORRIGIDO: Adicionada a classe "action-button" -->
+        <button id="action-button" class="action-button">Começar a Usar</button>
+        
+        <!-- CORRIGIDO: Adicionada a classe "action-button" -->
+        <button id="notifications-button" class="action-button" style="display: none;">Ativar Notificações</button>
     </div>
 
     <script>
-        // Versão final e limpa, sem o painel de depuração.
+        // Lógica final, robusta, baseada no clique do usuário e no estado das permissões.
 
         const actionButton = document.getElementById('action-button');
         const welcomeTitle = document.getElementById('welcome-title');
         const welcomeText = document.getElementById('welcome-text');
 
-        let currentStep = 'start'; // Passos: 'start', 'install', 'notify', 'redirect'
+        let currentStep = 'start'; // Os passos podem ser: 'start', 'install', 'notify', 'redirect'
 
+        // Função que decide o que fazer a seguir, baseada no estado atual
         async function nextStep() {
             // === PASSO DE INSTALAÇÃO ===
             if (window.deferredPrompt) {
@@ -55,6 +58,7 @@
             redirectToApp();
         }
 
+        // Função que muda a UI para a etapa de notificação
         function showNotificationStep() {
             welcomeTitle.innerText = 'Último Passo!';
             welcomeText.innerText = 'Clique abaixo para receber atualizações importantes e novidades do Montador de Sermões.';
@@ -66,6 +70,7 @@
             window.location.href = '/app';
         }
 
+        // Ouve o clique PRINCIPAL no botão de ação
         actionButton.addEventListener('click', async () => {
             if (currentStep === 'start' || currentStep === 'install') {
                 await nextStep();
@@ -73,12 +78,12 @@
                 try {
                     const permissionResult = await Notification.requestPermission();
                     if (permissionResult === 'granted') {
-                        await subscribeUserToPush();
+                        await subscribeUserToPush(); // Tenta inscrever
                     }
                 } catch (error) {
                     console.error('[Welcome] Erro ao pedir permissão de notificação:', error);
                 } finally {
-                    redirectToApp();
+                    redirectToApp(); // Redireciona independente do resultado
                 }
             }
         });
