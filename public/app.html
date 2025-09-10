@@ -7,7 +7,8 @@
     
     <meta name="theme-color" content="#2196F3">
     <link rel="manifest" href="manifest.json">
-    <link rel="apple-touch-icon" href="images/icons/icon-192x192.png">
+    <!-- CORRIGIDO: O caminho para o ícone foi ajustado para o local correto -->
+    <link rel="apple-touch-icon" href="/images/logo-192.png">
 
     <script src="pwa-installer.js" defer></script>
     
@@ -32,7 +33,6 @@
                 <h2 id="question">Qual será o tema do seu sermão?</h2>
                 <div id="input-area">
                     <input type="text" id="user-input" placeholder="Ex: A Parábola do Filho Pródigo">
-                    <!-- CORRIGIDO: Adicionada a classe "action-button" -->
                     <button onclick="nextStep()" class="action-button">Próximo Passo</button>
                 </div>
                 <div id="options" style="display: none;"></div>
