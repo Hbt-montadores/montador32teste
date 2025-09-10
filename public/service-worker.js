@@ -1,8 +1,6 @@
-// public/service-worker.js - Versão Final com Cache de Ícones Corrigido
+// public/service-worker.js - Versão Final de Produção (com badge e versão de cache atualizada)
 
-const CACHE_NAME = 'montador-de-sermoes-v1';
-// Lista de arquivos essenciais para o funcionamento offline.
-// CORREÇÃO: Adicionamos os caminhos exatos dos ícones aqui.
+const CACHE_NAME = 'montador-de-sermoes-v2'; // VERSÃO DO CACHE INCREMENTADA PARA FORÇAR ATUALIZAÇÃO
 const assetsToCache = [
   '/',
   '/app',
@@ -10,13 +8,14 @@ const assetsToCache = [
   '/script.js',
   '/pwa-installer.js',
   '/manifest.json',
-  '/images/logo-192.png', // Ícone usado para notificações e atalho
-  '/images/logo-512.png'  // Ícone maior para a tela de splash
+  '/images/logo-192.png',
+  '/images/logo-512.png',
+  '/images/badge-96.png' // Ícone para a barra de status
 ];
 
 // Evento 'install': Salva os assets essenciais em cache.
 self.addEventListener('install', event => {
-  console.log('[Service Worker] Instalando...');
+  console.log('[Service Worker] Instalando nova versão...');
   event.waitUntil(
     caches.open(CACHE_NAME)
       .then(cache => {
@@ -28,7 +27,7 @@ self.addEventListener('install', event => {
 
 // Evento 'activate': Limpa caches antigos para manter a aplicação atualizada.
 self.addEventListener('activate', event => {
-  console.log('[Service Worker] Ativando...');
+  console.log('[Service Worker] Ativando nova versão...');
   event.waitUntil(
     caches.keys().then(cacheNames => {
       return Promise.all(
@@ -43,10 +42,9 @@ self.addEventListener('activate', event => {
   );
 });
 
-// Evento 'fetch': Intercepta as requisições para permitir o funcionamento offline.
+// Evento 'fetch': Intercepta as requisições para permitir o funcionamento offline (estratégia Cache-First).
 self.addEventListener('fetch', event => {
   event.respondWith(
-    // Tenta encontrar a requisição no cache primeiro.
     caches.match(event.request)
       .then(response => {
         // Se encontrar no cache, retorna a resposta do cache.
@@ -63,17 +61,14 @@ self.addEventListener('fetch', event => {
 // --- Lógica de Notificações Push ---
 
 self.addEventListener('push', event => {
-  if (!event.data) {
-    console.error('[Service Worker] Push event, mas sem dados.');
-    return;
-  }
+  if (!event.data) return;
   
   const data = event.data.json();
   const title = data.title || 'Montador de Sermões';
   const options = {
     body: data.body || 'Você tem uma nova mensagem!',
-    icon: '/images/logo-192.png',  // Caminho para o ícone principal
-    badge: '/images/logo-192.png', // Caminho para o ícone da barra de status (Android)
+    icon: '/images/logo-192.png',
+    badge: '/images/badge-96.png', // Usa o ícone correto para a barra de status
     data: {
       url: data.url || '/app'
     }
